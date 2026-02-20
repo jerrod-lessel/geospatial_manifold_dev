@@ -1,4 +1,4 @@
-// map.js - full version (Landslide + Shaking MMI identify, colleges coded values, etc.)
+// map.js - full version 
 
 // Initialize the map
 var map = L.map('map').setView([37.5, -119.5], 6);
@@ -9,12 +9,15 @@ setTimeout(() => map.invalidateSize(), 200);
 var baseOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap contributors'
 }).addTo(map);
+
 const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
   attribution: 'Tiles © Esri'
 });
+
 const cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   attribution: '© Carto'
 });
+
 const cartoDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
   attribution: '© Carto'
 });
@@ -36,12 +39,59 @@ function showSpinner() { document.getElementById("loading-spinner").classList.re
 function hideSpinner() { document.getElementById("loading-spinner").classList.add("hidden"); }
 
 /* ================================
+   SERVICE URL CONFIG (ONE PLACE TO UPDATE)
+   ================================ */
+
+const SERVICES = {
+  // CGS
+  LANDSLIDE_MAPSERVER: "https://gis.conservation.ca.gov/server/rest/services/CGS/MS58_LandslideSusceptibility_Classes/MapServer",
+  SHAKING_IMAGESERVER: "https://gis.conservation.ca.gov/server/rest/services/CGS/MS48_MMI_PGV_10pc50/ImageServer",
+
+  // Fire Hazard Severity Zones
+  FIRE_SRA: "https://socogis.sonomacounty.ca.gov/map/rest/services/CALFIREPublic/State_Responsibility_Area_Fire_Hazard_Severity_Zones/FeatureServer/0",
+  FIRE_LRA: "https://services5.arcgis.com/t4zDNzBF9Dot8HEQ/arcgis/rest/services/FHSZ_LRA_25_/FeatureServer/0",
+
+  // FEMA Flood
+  FLOOD: "https://services2.arcgis.com/Uq9r85Potqm3MfRV/ArcGIS/rest/services/S_FLD_HAZ_AR_Reduced_Set_CA_wm/FeatureServer/0",
+
+  // CalEnviroScreen 4.0
+  CALENVIRO_4: "https://services1.arcgis.com/PCHfdHz4GlDNAhBb/arcgis/rest/services/CalEnviroScreen_4_0_Results_/FeatureServer/0",
+
+  // Active incidents (WFIGS / NIFC)
+  ACTIVE_FIRES: "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations_Current/FeatureServer/0",
+
+  // Caltrans / Infra
+  NHS: "https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHhighway/National_Highway_System/MapServer/0",
+  ALL_ROADS: "https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHhighway/All_Roads/MapServer/0",
+  PUBLIC_AIRPORTS: "https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHaviation/Public_Airport/FeatureServer/0",
+  STATE_BRIDGES: "https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHhighway/State_Highway_Bridges/FeatureServer/0",
+  LOCAL_BRIDGES: "https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHhighway/Local_Bridges/FeatureServer/0",
+
+  // Schools
+  SCHOOLS: "https://services3.arcgis.com/fdvHcZVgB2QSRNkL/arcgis/rest/services/SchoolSites2324/FeatureServer/0",
+
+  // Hospitals / health centers
+  HEALTH_CENTERS: "https://services5.arcgis.com/fMBfBrOnc6OOzh7V/arcgis/rest/services/facilitylist/FeatureServer/0",
+
+  // Power plants
+  POWER_PLANTS: "https://services3.arcgis.com/bWPjFyq029ChCGur/arcgis/rest/services/Power_Plant/FeatureServer/0",
+
+  // Colleges & Universities
+  COLLEGES: "https://services2.arcgis.com/FiaPA4ga0iQKduv3/ArcGIS/rest/services/Colleges_and_Universities_View/FeatureServer/0",
+
+  // Parks
+  PARKS: "https://gis.cnra.ca.gov/arcgis/rest/services/Boundaries/CPAD_AccessType/MapServer/1",
+
+  // Fire stations
+  FIRE_STATIONS: "https://services2.arcgis.com/FiaPA4ga0iQKduv3/arcgis/rest/services/Structures_Medical_Emergency_Response_v1/FeatureServer/2"
+};
+
+/* ================================
    LANDSLIDE IDENTIFY CONFIG & HELPERS
    ================================ */
 
 // CGS MapServer (public, no subscription required)
-const CGS_LANDSLIDE_URL =
-  "https://gis.conservation.ca.gov/server/rest/services/CGS/MS58_LandslideSusceptibility_Classes/MapServer";
+const CGS_LANDSLIDE_URL = SERVICES.LANDSLIDE_MAPSERVER;
 
 // If the service returns a numeric value, map it here (adjust if needed once we see attrs)
 const LANDSLIDE_CLASS_MAP = {
@@ -153,20 +203,11 @@ async function findNearestLandslide(latlng, { directions = 8, stepKm = 2, maxKm 
 
 // Dynamic Landslide Layer (visual only)
 var landslideLayer = L.esri.dynamicMapLayer({
-  url: 'https://gis.conservation.ca.gov/server/rest/services/CGS/MS58_LandslideSusceptibility_Classes/MapServer',
+  url: SERVICES.LANDSLIDE_MAPSERVER,
   opacity: 0.6
 }); // .addTo(map) if you want it on by default
 
 // Fire Hazard Zones (split public SRA + public LRA)
-
-// SRA (effective April 1, 2024) - public service
-const FIRE_SRA_URL =
-  "https://socogis.sonomacounty.ca.gov/map/rest/services/CALFIREPublic/State_Responsibility_Area_Fire_Hazard_Severity_Zones/FeatureServer/0";
-
-// LRA (recommended March 24, 2025) - public service
-const FIRE_LRA_URL =
-  "https://services5.arcgis.com/t4zDNzBF9Dot8HEQ/arcgis/rest/services/FHSZ_LRA_25_/FeatureServer/0";
-
 function fireStyle(feature) {
   const hazard = feature.properties.FHSZ_Description;
   let color = "#ffffff";
@@ -177,13 +218,13 @@ function fireStyle(feature) {
 }
 
 var fireHazardSRA = L.esri.featureLayer({
-  url: FIRE_SRA_URL,
+  url: SERVICES.FIRE_SRA,
   attribution: "CAL FIRE (SRA)",
   style: fireStyle
 });
 
 var fireHazardLRA = L.esri.featureLayer({
-  url: FIRE_LRA_URL,
+  url: SERVICES.FIRE_LRA,
   attribution: "CAL FIRE (LRA)",
   style: fireStyle
 });
@@ -193,7 +234,7 @@ var fireHazardLayer = L.layerGroup([fireHazardSRA, fireHazardLRA]);
 
 // Flood Hazard Layer
 var floodLayer = L.esri.featureLayer({
-  url: 'https://services2.arcgis.com/Uq9r85Potqm3MfRV/ArcGIS/rest/services/S_FLD_HAZ_AR_Reduced_Set_CA_wm/FeatureServer/0',
+  url: SERVICES.FLOOD,
   style: function (feature) {
     const zone = feature.properties.ESRI_SYMBOLOGY;
     const colorMap = {
@@ -208,7 +249,7 @@ var floodLayer = L.esri.featureLayer({
 
 // CalEnviroScreen Ozone Layer
 var ozoneLayer = L.esri.featureLayer({
-  url: "https://services1.arcgis.com/PCHfdHz4GlDNAhBb/arcgis/rest/services/CalEnviroScreen_4_0_Results_/FeatureServer/0",
+  url: SERVICES.CALENVIRO_4,
   where: "ozoneP IS NOT NULL",
   attribution: 'OEHHA - CalEnviroScreen 4.0',
   style: function (feature) {
@@ -230,7 +271,7 @@ var ozoneLayer = L.esri.featureLayer({
 
 // CalEnviroScreen PM2.5 Layer
 var pmLayer = L.esri.featureLayer({
-  url: "https://services1.arcgis.com/PCHfdHz4GlDNAhBb/arcgis/rest/services/CalEnviroScreen_4_0_Results_/FeatureServer/0",
+  url: SERVICES.CALENVIRO_4,
   where: "pmP IS NOT NULL",
   attribution: 'OEHHA - CalEnviroScreen 4.0',
   style: function (feature) {
@@ -252,7 +293,7 @@ var pmLayer = L.esri.featureLayer({
 
 // CalEnviroScreen Drinking Water Contaminant Percentile Layer
 var drinkP_Layer = L.esri.featureLayer({
-  url: "https://services1.arcgis.com/PCHfdHz4GlDNAhBb/arcgis/rest/services/CalEnviroScreen_4_0_Results_/FeatureServer/0",
+  url: SERVICES.CALENVIRO_4,
   where: "drinkP IS NOT NULL",
   attribution: 'OEHHA - CalEnviroScreen 4.0',
   style: function (feature) {
@@ -276,8 +317,7 @@ var drinkP_Layer = L.esri.featureLayer({
    SHAKING (MS48: MMI from PGV, 10% in 50 years)
    ================================ */
 
-const SHAKING_MMI_URL =
-  'https://gis.conservation.ca.gov/server/rest/services/CGS/MS48_MMI_PGV_10pc50/ImageServer';
+const SHAKING_MMI_URL = SERVICES.SHAKING_IMAGESERVER;
 
 // Visual layer (overlay)
 var shakingMMI_10in50 = L.esri.imageMapLayer({
@@ -390,7 +430,6 @@ function identifyMMIAt(latlng) {
   });
 }
 
-
 async function findNearestMMI(latlng, { directions = 8, stepKm = 2, maxKm = 14 } = {}) {
   const R = 6371, toRad = d => d * Math.PI/180, toDeg = r => r * 180/Math.PI;
   function offsetPoint(p, km, brgDeg) {
@@ -414,7 +453,7 @@ async function findNearestMMI(latlng, { directions = 8, stepKm = 2, maxKm = 14 }
 
 // --- Live Wildfire Incidents Layer (VERIFIED Public Source from NIFC) ---
 var calFireLayer = L.esri.featureLayer({
-  url: 'https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations_Current/FeatureServer/0',
+  url: SERVICES.ACTIVE_FIRES,
   where: "POOState = 'US-CA'",
   attribution: 'National Interagency Fire Center',
   pointToLayer: function (geojson, latlng) {
@@ -449,21 +488,21 @@ var calFireLayer = L.esri.featureLayer({
 
 // Caltrans National Highway System
 var highwayLayer = L.esri.featureLayer({
-  url: 'https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHhighway/National_Highway_System/MapServer/0',
+  url: SERVICES.NHS,
   attribution: 'Caltrans',
   style: () => ({ color: '#3c3c3c', weight: 3 })
 });
 
 // Caltrans All Roads
 var allRoadsLayer = L.esri.featureLayer({
-  url: 'https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHhighway/All_Roads/MapServer/0',
+  url: SERVICES.ALL_ROADS,
   attribution: 'Caltrans/DRISI',
   style: () => ({ color: '#5c5c5c', weight: 1 })
 });
 
-// Public schools 
+// Public schools
 var schoolsLayer = L.esri.featureLayer({
-  url: 'https://services3.arcgis.com/fdvHcZVgB2QSRNkL/arcgis/rest/services/SchoolSites2324/FeatureServer/0',
+  url: SERVICES.SCHOOLS,
   attribution: 'California Department of Education',
   pointToLayer: (geojson, latlng) => L.marker(latlng, {
     icon: L.divIcon({ html: "🏫", className: "school-icon", iconSize: L.point(30, 30) })
@@ -485,7 +524,7 @@ var schoolsLayer = L.esri.featureLayer({
 
 // Hospitals and health centers
 var healthCentLayer = L.esri.featureLayer({
-  url: 'https://services5.arcgis.com/fMBfBrOnc6OOzh7V/arcgis/rest/services/facilitylist/FeatureServer/0',
+  url: SERVICES.HEALTH_CENTERS,
   attribution: 'California Office of Statewide Health Planning and Development',
   pointToLayer: (geojson, latlng) => L.marker(latlng, {
     icon: L.divIcon({ html: "🏥", className: "healthCent-icon", iconSize: L.point(30, 30) })
@@ -503,7 +542,7 @@ var healthCentLayer = L.esri.featureLayer({
 
 // Public airports
 var pubAirport = L.esri.featureLayer({
-  url: 'https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHaviation/Public_Airport/FeatureServer/0',
+  url: SERVICES.PUBLIC_AIRPORTS,
   attribution: 'Caltrans Division of Aeronautics',
   pointToLayer: (geojson, latlng) => L.marker(latlng, {
     icon: L.divIcon({ html: "✈️", className: "airport-icon", iconSize: L.point(30, 30) })
@@ -521,7 +560,7 @@ var pubAirport = L.esri.featureLayer({
 
 // Power plants
 var powerPlants = L.esri.featureLayer({
-  url: 'https://services3.arcgis.com/bWPjFyq029ChCGur/arcgis/rest/services/Power_Plant/FeatureServer/0',
+  url: SERVICES.POWER_PLANTS,
   attribution: 'California Energy Commission',
   pointToLayer: (geojson, latlng) => L.marker(latlng, {
     icon: L.divIcon({ html: "⚡", className: "power-icon", iconSize: L.point(30, 30) })
@@ -564,7 +603,7 @@ function getChargersInView() {
           if (charger.Connections && charger.Connections.length > 0) {
             equipmentInfo = charger.Connections.map(conn => `
               <li>
-                <strong>${conn.ConnectionType?.Title ?? 'Connector'} (${conn.Quantity || 1})</strong>: 
+                <strong>${conn.ConnectionType?.Title ?? 'Connector'} (${conn.Quantity || 1})</strong>:
                 <br> ${conn.PowerKW ?? 'N/A'} kW <br> ${conn.Voltage ?? 'N/A'} V <br> ${conn.Amps ?? 'N/A'} A <br> (${conn.Level?.Title ?? 'Level info unavailable'})
               </li>
             `).join('');
@@ -593,8 +632,9 @@ map.on('moveend', getChargersInView);
 getChargersInView();
 
 // Colleges & Universities Layer (NCES, CA only, coded-value decoding)
-const collegesUrl = 'https://services2.arcgis.com/FiaPA4ga0iQKduv3/ArcGIS/rest/services/Colleges_and_Universities_View/FeatureServer/0';
+const collegesUrl = SERVICES.COLLEGES;
 const collegeDomains = {};
+
 function buildDomainMaps(md) {
   if (!md || !Array.isArray(md.fields)) return;
   md.fields.forEach(f => {
@@ -605,6 +645,7 @@ function buildDomainMaps(md) {
     }
   });
 }
+
 function decodeDomain(fieldName, value) {
   if (value == null) return "N/A";
   const dict = collegeDomains[fieldName];
@@ -612,6 +653,7 @@ function decodeDomain(fieldName, value) {
   const key = String(value);
   return dict[key] ?? value;
 }
+
 var universitiesLayer = L.esri.featureLayer({
   url: collegesUrl,
   where: "STABBR = 'CA'",
@@ -632,6 +674,7 @@ var universitiesLayer = L.esri.featureLayer({
     layer.bindPopup(popupContent);
   }
 });
+
 universitiesLayer.metadata((err, md) => {
   if (err) console.warn('Colleges metadata error:', err);
   else buildDomainMaps(md);
@@ -639,7 +682,7 @@ universitiesLayer.metadata((err, md) => {
 
 // --- Parks and Green Space Layer ---
 var parksLayer = L.esri.featureLayer({
-  url: 'https://gis.cnra.ca.gov/arcgis/rest/services/Boundaries/CPAD_AccessType/MapServer/1',
+  url: SERVICES.PARKS,
   style: () => ({ color: "#2E8B57", weight: 1, fillOpacity: 0.5 }),
   attribution: 'CA Natural Resources Agency (CPAD)',
   onEachFeature: function(feature, layer) {
@@ -655,7 +698,7 @@ var parksLayer = L.esri.featureLayer({
 
 // --- Fire Stations Layer ---
 var fireStationsLayer = L.esri.featureLayer({
-  url: 'https://services2.arcgis.com/FiaPA4ga0iQKduv3/arcgis/rest/services/Structures_Medical_Emergency_Response_v1/FeatureServer/2',
+  url: SERVICES.FIRE_STATIONS,
   where: "STATE = 'CA'",
   attribution: 'Esri Federal Data/NGDA',
   pointToLayer: (geojson, latlng) => L.marker(latlng, {
@@ -681,7 +724,7 @@ map.on('overlayremove', function(e) {
 
 // State bridges
 var stateBridgesLayer = L.esri.featureLayer({
-  url: "https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHhighway/State_Highway_Bridges/FeatureServer/0",
+  url: SERVICES.STATE_BRIDGES,
   attribution: 'Caltrans',
   pointToLayer: (geojson, latlng) => L.circleMarker(latlng, {
     radius: 5, fillColor: "#636363", color: "#252525", weight: 1, opacity: 1, fillOpacity: 0.7
@@ -699,7 +742,7 @@ var stateBridgesLayer = L.esri.featureLayer({
 
 // Local bridges
 var localBridgesLayer = L.esri.featureLayer({
-  url: "https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHhighway/Local_Bridges/FeatureServer/0",
+  url: SERVICES.LOCAL_BRIDGES,
   attribution: 'Caltrans',
   pointToLayer: (geojson, latlng) => L.circleMarker(latlng, {
     radius: 5, fillColor: "#bdbdbd", color: "#636363", weight: 1, opacity: 1, fillOpacity: 0.7
@@ -726,12 +769,14 @@ map.on('zoomend', function() {
     if (map.hasLayer(highwayLayer)) map.removeLayer(highwayLayer);
   }
 });
+
 function toggleAtZoom(layer, minZoom) {
   map.on("zoomend", function () {
     if (map.getZoom() >= minZoom) { if (!map.hasLayer(layer)) map.addLayer(layer); }
     else { if (map.hasLayer(layer)) map.removeLayer(layer); }
   });
 }
+
 toggleAtZoom(schoolsLayer, 14);
 toggleAtZoom(stateBridgesLayer, 14);
 toggleAtZoom(localBridgesLayer, 14);
@@ -765,7 +810,6 @@ L.control.layers(
     "Fire Hazard Zones": fireHazardLayer,
     "Flood Hazard Zones": floodLayer,
     "Landslide Susceptibility": landslideLayer,
-    // You can name this "Shaking Potential" in the UI:
     "Shaking Potential (MMI, 10%/50yr)": shakingMMI_10in50,
     "Active Fires": calFireLayer,
 
@@ -908,29 +952,6 @@ function getClosestFeatureByEdgeDistance(layer, clickLatLng, label, fieldName, _
   });
 }
 
-/*
-// Generalized nearest feature query
-function getClosestFeatureByEdgeDistance(layer, clickLatLng, label, fieldName, results, finishCallback) {
-  layer.query().nearby(clickLatLng, 80467).run(function (err, fc) {
-    if (!err && fc.features.length > 0) {
-      let minDist = Infinity, bestFeature = null;
-      fc.features.forEach(feature => {
-        const dist = parseFloat(getDistanceToPolygonEdge(clickLatLng, feature));
-        if (!isNaN(dist) && dist < minDist) { minDist = dist; bestFeature = feature; }
-      });
-      if (bestFeature) {
-        results.push(`■ <strong>Nearest ${label}:</strong> ${bestFeature.properties[fieldName]}<br>📏 Distance: ${minDist} mi`);
-      } else {
-        results.push(`❌ <strong>${label}:</strong> Unable to measure distance`);
-      }
-    } else {
-      results.push(`❌ <strong>${label}:</strong> No nearby zones`);
-    }
-    finishCallback();
-  });
-}
-*/
-
 /* ================================
    CLICK EVENT: HAZARD QUERIES
    ================================ */
@@ -976,102 +997,102 @@ map.on("click", function (e) {
   }
 
   // --- Fire (LRA first, then SRA, then nearest across both)
-function queryContains(layer, latlng) {
-  return new Promise((resolve) => {
-    layer.query().contains(latlng).run((err, fc) => {
-      if (err) return resolve({ err, fc: null });
-      resolve({ err: null, fc });
+  function queryContains(layer, latlng) {
+    return new Promise((resolve) => {
+      layer.query().contains(latlng).run((err, fc) => {
+        if (err) return resolve({ err, fc: null });
+        resolve({ err: null, fc });
+      });
     });
-  });
-}
+  }
 
-function queryNearby(layer, latlng, meters = 80467) { // ~50 miles
-  return new Promise((resolve) => {
-    layer.query().nearby(latlng, meters).run((err, fc) => {
-      if (err) return resolve({ err, fc: null });
-      resolve({ err: null, fc });
+  function queryNearby(layer, latlng, meters = 80467) { // ~50 miles
+    return new Promise((resolve) => {
+      layer.query().nearby(latlng, meters).run((err, fc) => {
+        if (err) return resolve({ err, fc: null });
+        resolve({ err: null, fc });
+      });
     });
-  });
-}
+  }
 
-async function nearestByEdgeDistanceAcross(layers, latlng, label, fieldName) {
-  let best = null; // { dist, text }
-  for (const lyr of layers) {
-    // eslint-disable-next-line no-await-in-loop
-    const { err, fc } = await queryNearby(lyr, latlng, 80467);
-    if (err || !fc || !fc.features || fc.features.length === 0) continue;
+  async function nearestByEdgeDistanceAcross(layers, latlng, label, fieldName) {
+    let best = null; // { dist, text }
+    for (const lyr of layers) {
+      // eslint-disable-next-line no-await-in-loop
+      const { err, fc } = await queryNearby(lyr, latlng, 80467);
+      if (err || !fc || !fc.features || fc.features.length === 0) continue;
 
-    for (const f of fc.features) {
-      const dist = parseFloat(getDistanceToPolygonEdge(latlng, f));
-      if (!Number.isFinite(dist)) continue;
-      if (!best || dist < best.dist) {
-        best = {
-          dist,
-          text: `■ <strong>Nearest ${label}:</strong> ${f.properties[fieldName]}<br>📏 Distance: ${dist.toFixed(2)} mi`
-        };
+      for (const f of fc.features) {
+        const dist = parseFloat(getDistanceToPolygonEdge(latlng, f));
+        if (!Number.isFinite(dist)) continue;
+        if (!best || dist < best.dist) {
+          best = {
+            dist,
+            text: `■ <strong>Nearest ${label}:</strong> ${f.properties[fieldName]}<br>📏 Distance: ${dist.toFixed(2)} mi`
+          };
+        }
       }
     }
+    return best ? best.text : `❌ <strong>${label}:</strong> No nearby zones found`;
   }
-  return best ? best.text : `❌ <strong>${label}:</strong> No nearby zones found`;
-}
 
-(async () => {
-  try {
-    // 1) LRA contains?
-    const lraRes = await queryContains(fireHazardLRA, e.latlng);
-    if (!lraRes.err && lraRes.fc?.features?.length) {
-      const zone = lraRes.fc.features[0].properties.FHSZ_Description;
-      results.fire = `■ <strong>Fire Hazard Zone (LRA):</strong><br>
+  (async () => {
+    try {
+      // 1) LRA contains?
+      const lraRes = await queryContains(fireHazardLRA, e.latlng);
+      if (!lraRes.err && lraRes.fc?.features?.length) {
+        const zone = lraRes.fc.features[0].properties.FHSZ_Description;
+        results.fire = `■ <strong>Fire Hazard Zone (LRA):</strong><br>
 This area falls within a <strong>${zone}</strong> fire hazard zone (Local Responsibility Area).`;
-      checkDone();
-      return;
-    }
+        checkDone();
+        return;
+      }
 
-    // 2) SRA contains?
-    const sraRes = await queryContains(fireHazardSRA, e.latlng);
-    if (!sraRes.err && sraRes.fc?.features?.length) {
-      const zone = sraRes.fc.features[0].properties.FHSZ_Description;
-      results.fire = `■ <strong>Fire Hazard Zone (SRA):</strong><br>
+      // 2) SRA contains?
+      const sraRes = await queryContains(fireHazardSRA, e.latlng);
+      if (!sraRes.err && sraRes.fc?.features?.length) {
+        const zone = sraRes.fc.features[0].properties.FHSZ_Description;
+        results.fire = `■ <strong>Fire Hazard Zone (SRA):</strong><br>
 This area falls within a <strong>${zone}</strong> fire hazard zone (State Responsibility Area).`;
+        checkDone();
+        return;
+      }
+
+      // 3) Nearest across BOTH
+      const nearestText = await nearestByEdgeDistanceAcross(
+        [fireHazardLRA, fireHazardSRA],
+        e.latlng,
+        "Fire Hazard Zone",
+        "FHSZ_Description"
+      );
+
+      results.fire = nearestText + `<br><em>Note: Zones are designated by CAL FIRE for planning and mitigation guidance.</em>`;
       checkDone();
-      return;
+    } catch (ex) {
+      results.fire = "■ <strong>Fire Hazard Zone:</strong> Error fetching data.";
+      checkDone();
     }
+  })();
 
-    // 3) Nearest across BOTH
-    const nearestText = await nearestByEdgeDistanceAcross(
-      [fireHazardLRA, fireHazardSRA],
-      e.latlng,
-      "Fire Hazard Zone",
-      "FHSZ_Description"
-    );
-
-    results.fire = nearestText + `<br><em>Note: Zones are designated by CAL FIRE for planning and mitigation guidance.</em>`;
-    checkDone();
-  } catch (ex) {
-    results.fire = "■ <strong>Fire Hazard Zone:</strong> Error fetching data.";
-    checkDone();
-  }
-})();
-
-// --- Flood
-floodLayer.query().contains(e.latlng).run((err, fc) => {
-  if (!err && fc.features.length > 0) {
-    const zone = fc.features[0].properties.ESRI_SYMBOLOGY;
-    results.flood = `■ <strong>Flood Hazard Zone:</strong><br>
+  // --- Flood
+  floodLayer.query().contains(e.latlng).run((err, fc) => {
+    if (!err && fc.features.length > 0) {
+      const zone = fc.features[0].properties.ESRI_SYMBOLOGY;
+      results.flood = `■ <strong>Flood Hazard Zone:</strong><br>
 This location falls within a <strong>${zone}</strong> as designated by FEMA's National Flood Hazard Layer.<br>
 Flood zones represent areas at varying levels of flood risk during extreme weather events and are used to inform insurance, development, and evacuation planning.`;
-    checkDone();
-  } else {
-    // fallback: nearest zone
-    getClosestFeatureByEdgeDistance(
-      floodLayer, e.latlng, "Flood Hazard Zone", "ESRI_SYMBOLOGY",
-      [], (nearestText) => {
-        results.flood = nearestText + `<br><em>Note: FEMA flood zones help identify areas at high risk for flooding and guide floodplain management decisions across California.</em>`;
-        checkDone();
-      }
-    );
-  }
-});
+      checkDone();
+    } else {
+      // fallback: nearest zone
+      getClosestFeatureByEdgeDistance(
+        floodLayer, e.latlng, "Flood Hazard Zone", "ESRI_SYMBOLOGY",
+        [], (nearestText) => {
+          results.flood = nearestText + `<br><em>Note: FEMA flood zones help identify areas at high risk for flooding and guide floodplain management decisions across California.</em>`;
+          checkDone();
+        }
+      );
+    }
+  });
 
   // --- Ozone
   ozoneLayer.query().contains(e.latlng).run((err, fc) => {
@@ -1146,159 +1167,4 @@ Estimated intensity: <strong>${fmt.valueStr}</strong> (${fmt.label}).`;
       checkDone();
     }
   })();
-
 });
-
-/*
-map.on("click", function (e) {
-  showSpinner();
-  if (clickMarker) map.removeLayer(clickMarker);
-  clickMarker = L.marker(e.latlng).addTo(map);
-
-  const lat = e.latlng.lat, lng = e.latlng.lng;
-  document.getElementById("report-content").innerHTML =
-    `<strong>Location:</strong><br>Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}<br><em>Loading hazard information...</em>`;
-
-  const results = [];
-  let completed = 0;
-  function checkDone() {
-    completed++;
-    if (completed === 7) { // fire, flood, ozone, pm, drinkP, landslide, shaking
-      document.getElementById("report-content").innerHTML = results.join("<br><br>");
-      hideSpinner();
-    }
-  }
-
-  // Fire
-  fireHazardLayer.query().contains(e.latlng).run(function (err, fc) {
-    if (!err && fc.features.length > 0) {
-      const zone = fc.features[0].properties.FHSZ_Description;
-      results.push(`■ <strong>Fire Hazard Zone:</strong><br>
-This area falls within a <strong>${zone}</strong> fire hazard zone as defined by the California Department of Forestry and Fire Protection (CAL FIRE).<br>
-Fire hazard zones reflect the severity of potential fire exposure based on fuels, terrain, weather, and other factors.`);
-      checkDone();
-    } else {
-      getClosestFeatureByEdgeDistance(fireHazardLayer, e.latlng, "Fire Hazard Zone", "FHSZ_Description", results, function () {
-        results.push(`■ <em>Note:</em> Fire hazard zones are designated by CAL FIRE to help guide planning and mitigation efforts in wildfire-prone regions.`);
-        checkDone();
-      });
-    }
-  });
-
-  // Flood
-  floodLayer.query().contains(e.latlng).run(function (err, fc) {
-    if (!err && fc.features.length > 0) {
-      const zone = fc.features[0].properties.ESRI_SYMBOLOGY;
-      results.push(`■ <strong>Flood Hazard Zone:</strong><br>
-This location falls within a <strong>${zone}</strong> as designated by FEMA's National Flood Hazard Layer.<br>
-Flood zones represent areas at varying levels of flood risk during extreme weather events and are used to inform insurance, development, and evacuation planning.`);
-      checkDone();
-    } else {
-      getClosestFeatureByEdgeDistance(floodLayer, e.latlng, "Flood Hazard Zone", "ESRI_SYMBOLOGY", results, function () {
-        results.push(`■ <em>Note:</em> FEMA flood zones help identify areas at high risk for flooding and guide floodplain management decisions across California.`);
-        checkDone();
-      });
-    }
-  });
-
-  // Ozone (full text)
-  ozoneLayer.query().contains(e.latlng).run(function (err, fc) {
-    if (!err && fc.features.length > 0) {
-      const p = fc.features[0].properties;
-      const ppm = p.ozone?.toFixed(3) ?? "unknown";
-      const pct = p.ozoneP !== undefined ? Math.round(p.ozoneP) : "unknown";
-      results.push(`■ <strong>Ozone (Ground-Level):</strong><br>
-The indicator is the mean of summer months (May – October) of the daily maximum 8-hour ozone concentration (ppm). This measurement is used to represent short-term ozone health impacts. This census tract has a summed concentration of <strong>${ppm} ppm</strong>.
-The ozone percentile for this census tract is <strong>${pct}</strong>, meaning the summed concentration is higher than ${pct}% of the census tracts in California.<br>
-<em>(Data from 2017 to 2019)</em>`);
-      checkDone();
-    } else {
-      getClosestFeatureByEdgeDistance(ozoneLayer, e.latlng, "Ozone Level", "ozoneP", results, checkDone);
-    }
-  });
-
-  // PM2.5 (full text)
-  pmLayer.query().contains(e.latlng).run(function (err, fc) {
-    if (!err && fc.features.length > 0) {
-      const p = fc.features[0].properties;
-      const value = p.pm?.toFixed(2) ?? "unknown";
-      const pct = p.pmP !== undefined ? Math.round(p.pmP) : "unknown";
-      results.push(`■ <strong>PM2.5 (Fine Particulate Matter) Concentration:</strong><br>
-This census tract has a concentration of <strong>${value} µg/m³</strong>. The PM2.5 percentile for this census tract is <strong>${pct}</strong>, meaning it is higher than ${pct}% of the census tracts in California.<br>
-<em>(Data from 2015 to 2017)</em>`);
-      checkDone();
-    } else {
-      getClosestFeatureByEdgeDistance(pmLayer, e.latlng, "PM2.5 Concentration", "pmP", results, checkDone);
-    }
-  });
-
-  // Drinking water (full text)
-  drinkP_Layer.query().contains(e.latlng).run(function (err, fc) {
-    if (!err && fc.features.length > 0) {
-      const p = fc.features[0].properties;
-      const value = p.drink?.toFixed(2) ?? "unknown";
-      const pct = p.drinkP !== undefined ? Math.round(p.drinkP) : "unknown";
-      results.push(`■ <strong>Drinking Water Contaminants:</strong><br>
-The drinking water contaminant score for this census tract is <strong>${value}</strong>, which is the sum of the contaminant and violation percentiles.
-The drinking water contaminant percentile is <strong>${pct}</strong>, meaning it is higher than ${pct}% of census tracts in California.<br>
-<em>(Data from 2011–2019, the most recent complete compliance cycle.)</em>`);
-      checkDone();
-    } else {
-      getClosestFeatureByEdgeDistance(drinkP_Layer, e.latlng, "Drinking Water Contaminant Score", "drinkP", results, checkDone);
-    }
-  });
-
-  // === Landslide Susceptibility ===
-  (async () => {
-    try {
-      const label = await identifyLandslideAt(e.latlng);
-      if (label) {
-        results.push(`■ <strong>Landslide Susceptibility:</strong><br>
-Class <strong>${label}</strong> (California Geological Survey).`);
-        checkDone();
-        return;
-      }
-      const nearest = await findNearestLandslide(e.latlng, { directions: 8, stepKm: 2, maxKm: 14 });
-      if (nearest) {
-        results.push(`■ <strong>Landslide Susceptibility (Nearest):</strong><br>
-Class: <strong>${nearest.label}</strong><br>📏 Distance: ${nearest.distanceKm.toFixed(1)} km`);
-      } else {
-        results.push(`■ <strong>Landslide Susceptibility:</strong> No mapped value nearby.`);
-      }
-    } catch (err) {
-      console.warn("Landslide identify error:", err);
-      results.push(`■ <strong>Landslide Susceptibility:</strong> Error fetching value.`);
-    } finally {
-      checkDone();
-    }
-  })();
-
-  // === Shaking (MMI from PGV, 10% in 50 yrs) ===
-  (async () => {
-    try {
-      const mmi = await identifyMMIAt(e.latlng);
-      if (mmi != null) {
-        const fmt = formatMMI(mmi);
-        results.push(`■ <strong>Shaking Potential (MMI, 10%/50yr):</strong><br>
-Estimated intensity: <strong>${fmt.valueStr}</strong> (<strong>${fmt.label}</strong>)`);
-        checkDone();
-        return;
-      }
-      const nearest = await findNearestMMI(e.latlng, { directions: 8, stepKm: 2, maxKm: 14 });
-      if (nearest) {
-        const fmt = formatMMI(nearest.mmi);
-        results.push(`■ <strong>Shaking Potential (Nearest, 10%/50yr):</strong><br>
-Intensity: <strong>${fmt.valueStr}</strong> (<strong>${fmt.label}</strong>)<br>📏 Distance: ${nearest.distanceKm.toFixed(1)} km`);
-      } else {
-        results.push(`■ <strong>Shaking Potential (MMI, 10%/50yr):</strong> No mapped value nearby.`);
-      }
-    } catch (err) {
-      console.warn('MMI identify error:', err);
-      results.push(`■ <strong>Shaking Potential (MMI, 10%/50yr):</strong> Error fetching value.`);
-    } finally {
-      checkDone();
-    }
-  })();
-
-}); // end click
-*/
