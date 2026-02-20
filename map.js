@@ -157,19 +157,39 @@ var landslideLayer = L.esri.dynamicMapLayer({
   opacity: 0.6
 }); // .addTo(map) if you want it on by default
 
-// Fire Hazard Layer
-var fireHazardLayer = L.esri.featureLayer({
-  url: 'https://services1.arcgis.com/jUJYIo9tSA7EHvfZ/arcgis/rest/services/FHSZ_SRA_LRA_Combined/FeatureServer/0',
-  attribution: 'CAL FIRE',
-  style: function (feature) {
-    const hazard = feature.properties.FHSZ_Description;
-    let color = "#ffffff";
-    if (hazard === "Very High") color = "#d7191c";
-    else if (hazard === "High") color = "#fdae61";
-    else if (hazard === "Moderate") color = "#ffffbf";
-    return { color, weight: 1, fillOpacity: 0.4 };
-  }
-}); // .addTo(map)
+// Fire Hazard Zones (split public SRA + public LRA)
+
+// SRA (effective April 1, 2024) - public service
+const FIRE_SRA_URL =
+  "https://socogis.sonomacounty.ca.gov/map/rest/services/CALFIREPublic/State_Responsibility_Area_Fire_Hazard_Severity_Zones/FeatureServer/0";
+
+// LRA (recommended March 24, 2025) - public service
+const FIRE_LRA_URL =
+  "https://services5.arcgis.com/t4zDNzBF9Dot8HEQ/arcgis/rest/services/FHSZ_LRA_25_/FeatureServer/0";
+
+function fireStyle(feature) {
+  const hazard = feature.properties.FHSZ_Description;
+  let color = "#ffffff";
+  if (hazard === "Very High") color = "#d7191c";
+  else if (hazard === "High") color = "#fdae61";
+  else if (hazard === "Moderate") color = "#ffffbf";
+  return { color, weight: 1, fillOpacity: 0.4 };
+}
+
+var fireHazardSRA = L.esri.featureLayer({
+  url: FIRE_SRA_URL,
+  attribution: "CAL FIRE (SRA)",
+  style: fireStyle
+});
+
+var fireHazardLRA = L.esri.featureLayer({
+  url: FIRE_LRA_URL,
+  attribution: "CAL FIRE (LRA)",
+  style: fireStyle
+});
+
+// One “combined” layer for toggles (turns both on/off together)
+var fireHazardLayer = L.layerGroup([fireHazardSRA, fireHazardLRA]);
 
 // Flood Hazard Layer
 var floodLayer = L.esri.featureLayer({
@@ -955,25 +975,83 @@ map.on("click", function (e) {
     }
   }
 
-  // --- Fire
-fireHazardLayer.query().contains(e.latlng).run((err, fc) => {
-  if (!err && fc.features.length > 0) {
-    const zone = fc.features[0].properties.FHSZ_Description;
-    results.fire = `■ <strong>Fire Hazard Zone:</strong><br>
-This area falls within a <strong>${zone}</strong> fire hazard zone as defined by the California Department of Forestry and Fire Protection (CAL FIRE).<br>
-Fire hazard zones reflect the severity of potential fire exposure based on fuels, terrain, weather, and other factors.`;
-    checkDone();
-  } else {
-    // fallback: nearest zone
-    getClosestFeatureByEdgeDistance(
-      fireHazardLayer, e.latlng, "Fire Hazard Zone", "FHSZ_Description",
-      [], (nearestText) => {
-        results.fire = nearestText + `<br><em>Note: Fire hazard zones are designated by CAL FIRE to help guide planning and mitigation efforts in wildfire-prone regions.</em>`;
-        checkDone();
+  // --- Fire (LRA first, then SRA, then nearest across both)
+function queryContains(layer, latlng) {
+  return new Promise((resolve) => {
+    layer.query().contains(latlng).run((err, fc) => {
+      if (err) return resolve({ err, fc: null });
+      resolve({ err: null, fc });
+    });
+  });
+}
+
+function queryNearby(layer, latlng, meters = 80467) { // ~50 miles
+  return new Promise((resolve) => {
+    layer.query().nearby(latlng, meters).run((err, fc) => {
+      if (err) return resolve({ err, fc: null });
+      resolve({ err: null, fc });
+    });
+  });
+}
+
+async function nearestByEdgeDistanceAcross(layers, latlng, label, fieldName) {
+  let best = null; // { dist, text }
+  for (const lyr of layers) {
+    // eslint-disable-next-line no-await-in-loop
+    const { err, fc } = await queryNearby(lyr, latlng, 80467);
+    if (err || !fc || !fc.features || fc.features.length === 0) continue;
+
+    for (const f of fc.features) {
+      const dist = parseFloat(getDistanceToPolygonEdge(latlng, f));
+      if (!Number.isFinite(dist)) continue;
+      if (!best || dist < best.dist) {
+        best = {
+          dist,
+          text: `■ <strong>Nearest ${label}:</strong> ${f.properties[fieldName]}<br>📏 Distance: ${dist.toFixed(2)} mi`
+        };
       }
-    );
+    }
   }
-});
+  return best ? best.text : `❌ <strong>${label}:</strong> No nearby zones found`;
+}
+
+(async () => {
+  try {
+    // 1) LRA contains?
+    const lraRes = await queryContains(fireHazardLRA, e.latlng);
+    if (!lraRes.err && lraRes.fc?.features?.length) {
+      const zone = lraRes.fc.features[0].properties.FHSZ_Description;
+      results.fire = `■ <strong>Fire Hazard Zone (LRA):</strong><br>
+This area falls within a <strong>${zone}</strong> fire hazard zone (Local Responsibility Area).`;
+      checkDone();
+      return;
+    }
+
+    // 2) SRA contains?
+    const sraRes = await queryContains(fireHazardSRA, e.latlng);
+    if (!sraRes.err && sraRes.fc?.features?.length) {
+      const zone = sraRes.fc.features[0].properties.FHSZ_Description;
+      results.fire = `■ <strong>Fire Hazard Zone (SRA):</strong><br>
+This area falls within a <strong>${zone}</strong> fire hazard zone (State Responsibility Area).`;
+      checkDone();
+      return;
+    }
+
+    // 3) Nearest across BOTH
+    const nearestText = await nearestByEdgeDistanceAcross(
+      [fireHazardLRA, fireHazardSRA],
+      e.latlng,
+      "Fire Hazard Zone",
+      "FHSZ_Description"
+    );
+
+    results.fire = nearestText + `<br><em>Note: Zones are designated by CAL FIRE for planning and mitigation guidance.</em>`;
+    checkDone();
+  } catch (ex) {
+    results.fire = "■ <strong>Fire Hazard Zone:</strong> Error fetching data.";
+    checkDone();
+  }
+})();
 
 // --- Flood
 floodLayer.query().contains(e.latlng).run((err, fc) => {
