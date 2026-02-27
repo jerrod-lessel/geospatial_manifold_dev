@@ -443,12 +443,7 @@ html, body {
 
 /* Limit popup size and make contents scroll if too long */
 .leaflet-popup-content {
-  max-height: 200px;   /* adjust for your needs */
+  max-height: 220px;   /* adjust for your needs */
   overflow-y: auto;
-}
-
-.ev-popup {
-  max-height: 220px;   /* adjust to taste */
-  overflow-y: auto;    /* adds a scrollbar if it’s too tall */
 }
 
