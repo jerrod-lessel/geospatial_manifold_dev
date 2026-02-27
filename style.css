@@ -151,6 +151,9 @@ html, body {
   overflow: hidden;
 
   background-color: #000000;
+
+  /* important for nested scrolling in flex layouts */
+  min-height: 0;
 }
 
 /* Sidebar (left) */
@@ -167,6 +170,7 @@ html, body {
   overflow-y: auto;
 
   /* Must fill its available height to avoid weird scrolling */
+  min-height: 0;  
   max-height: 100%;
 
   box-shadow: 2px 0 5px rgba(0,0,0,0.1);
@@ -181,6 +185,8 @@ html, body {
   font-size: 0.95rem;
   line-height: 1.4;
   margin-top: 10px;
+  flex: 1;
+  min-height: 0;
 
   /* Let it use remaining vertical space */
   flex-grow: 1;
@@ -451,3 +457,5 @@ html, body {
     max-height: 65vh;
   }
 }
+
+
