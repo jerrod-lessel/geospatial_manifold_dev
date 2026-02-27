@@ -3,7 +3,7 @@ html, body {
   padding: 0;
   height: 100%;
   font-family: Arial, sans-serif;
-  overflow: hidden; 
+  overflow: hidden;
   background-color: black;
 }
 
@@ -20,8 +20,8 @@ html, body {
   top: 0;
   z-index: 1000;
   color: white;
-  text-shadow: 
-    -1px -1px 0 #000,  
+  text-shadow:
+    -1px -1px 0 #000,
      1px -1px 0 #000,
     -1px  1px 0 #000,
      1px  1px 0 #000;
@@ -36,8 +36,8 @@ html, body {
   font-size: 1.5rem;
   font-weight: bold;
   letter-spacing: 1px;
-    text-shadow: 
-    -1px -1px 0 #000,  
+  text-shadow:
+    -1px -1px 0 #000,
      1px -1px 0 #000,
     -1px  1px 0 #000,
      1px  1px 0 #000;
@@ -59,12 +59,8 @@ html, body {
 
 #about-panel {
   background: #5A5A5A;
-  color: #333;
   padding: 1rem;
   font-size: 0.95rem;
-  #border-bottom: 2px solid #ccc;
-  #border-radius: 13px;
-  #background-color: #5A5A5A; /* Grey background */
   color: #eeeeee;
 }
 
@@ -83,10 +79,10 @@ html, body {
 
 #container {
   display: flex;
-  height: calc(100vh - 80px); /* Adjust for banner height */
+  height: calc(100vh - 80px);
   width: 100%;
   border: 3px solid black;
-  overflow: hidden; /* Ensure no extra scrolling space */
+  overflow: hidden;
   background-color: #000000;
 }
 
@@ -98,10 +94,10 @@ html, body {
   box-sizing: border-box;
   overflow-y: auto;
   box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-  max-height: 100%; /* ⬅ Add this so the sidebar fills its space and scrolls fully */
+  max-height: 100%;
   border-radius: 13px;
-  background-color: #5A5A5A; /* Grey background */
-  color: #eeeeee;  /* Optional: white text for contrast */
+  background-color: #5A5A5A;
+  color: #eeeeee;
 }
 
 #map {
@@ -111,7 +107,7 @@ html, body {
   position: relative;
   z-index: 1;
   border-radius: 13px;
-  overflow: hidden;  /* Ensures inner map doesn't spill out of rounded corners */
+  overflow: hidden;
 }
 
 #report-content {
@@ -205,16 +201,9 @@ html, body {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
   z-index: 999;
   touch-action: auto;
-  overscroll-behavior: contain; 
-  overflow-y: auto;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 1rem;
-}
-
-.legend-panel h4 {
-  margin-top: 0;
-  font-size: 14px;
-  text-align: center;
 }
 
 .legend-section {
@@ -235,99 +224,47 @@ html, body {
   border: 1px solid #888;
 }
 
-.legend-panel::-webkit-scrollbar {
-  width: 8px;
-}
-
-.legend-panel::-webkit-scrollbar-thumb {
-  background-color: #888;
-  border-radius: 4px;
-}
-
-.legend-panel::-webkit-scrollbar-thumb:hover {
-  background-color: #555;
-}
-
-.hidden {
-  display: none;
-}
-
-.school-icon {
-  font-size: 27px;  
-  text-align: center;
-  line-height: 1;
-}
-
-.university-icon {
-  font-size: 27px;  
-  text-align: center;
-  line-height: 1;
-}
-
-.healthCent-icon {
-  font-size: 27px;  
-  text-align: center;
-  line-height: 1;
-}
-
-.airport-icon {
-  font-size: 27px;  
-  text-align: center;
-  line-height: 1;
-}
-
-.power-icon {
-  font-size: 27px;  
-  text-align: center;
-  line-height: 1;
-}
-
-.evcharger-icon {
-  font-size: 27px;  
-  text-align: center;
-  line-height: 1;
-}
-
+.school-icon,
+.university-icon,
+.healthCent-icon,
+.airport-icon,
+.power-icon,
+.evcharger-icon,
 .fire-station-icon {
-  font-size: 27px;  
+  font-size: 27px;
   text-align: center;
   line-height: 1;
 }
 
 .fire-icon {
-  /* These properties help center the emoji perfectly inside its container */
   display: flex;
   justify-content: center;
   align-items: center;
   line-height: 1;
 }
 
-/* Define the different font sizes for our fire categories */
 .fire-icon-sm { font-size: 15px; }
 .fire-icon-md { font-size: 25px; }
 .fire-icon-lg { font-size: 40px; }
 .fire-icon-xl { font-size: 50px; }
 
 @media (max-width: 768px) {
-  #container {
-    flex-direction: column;
-  }
-  
+  #container { flex-direction: column; }
+
   .legend-panel {
-      max-height: 65vh;
-      overflow-y: scroll;
-      padding-bottom: 2rem;
-    }
-  
+    max-height: 65vh;
+    overflow-y: scroll;
+    padding-bottom: 2rem;
+  }
+
   #sidebar {
     width: 100%;
     height: 45vh;
     border-right: none;
-    #border-bottom: 2px solid #ccc;
   }
 
   #map {
-    height: calc(100vh - 80px - 300px); 
+    height: calc(100vh - 80px - 300px);
   }
 
   #report-content {
@@ -336,71 +273,20 @@ html, body {
     touch-action: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
-  }  
-}
-
-#top-banner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
-  padding: 0.75rem 1rem;
-  border-bottom: 2px solid #0f2027;
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  color: white;
-}
-
-#left-banner {
-  display: flex;
-  align-items: center;
-}
-
-#site-logo {
-  height: 45px;
-  margin-right: 0.5rem;
-}
-
-#titles {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;  /* Ensures left alignment */
-}
-
-#main-title {
-  font-size: 1.5rem;
-  font-weight: bold;
-  letter-spacing: 1px;
-  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
-}
-
-#subtitle {
-  font-size: 0.85rem;
-  opacity: 0.85;
-}
-
-#about-toggle {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  border: 1px solid #fff;
-  border-radius: 4px;
-  padding: 0.25rem 0.5rem;
-  cursor: pointer;
-  transition: background 0.3s;
+  }
 }
 
 #loading-spinner {
   position: absolute;
   top: 50%;
-  left: 150px; /* Half of sidebar width (300px) */
+  left: 150px;
   transform: translate(-50%, -50%);
   z-index: 2000;
 }
 
 .spinner {
-  border: 8px solid #f3f3f3; /* Light grey */
-  border-top: 8px solid #2c5364; /* Blue-Grey, matching Right-Side Banner */
+  border: 8px solid #f3f3f3;
+  border-top: 8px solid #2c5364;
   border-radius: 50%;
   width: 30px;
   height: 30px;
@@ -412,38 +298,27 @@ html, body {
   100% { transform: rotate(360deg); }
 }
 
-/* Custom Leaflet-style button fix */
-.custom-button {
-  width: 43px;
-  height: 43px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #fff;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
-  cursor: pointer;
-}
+/* ============================
+   EV POPUP: SINGLE SCROLLBAR FIX
+   ============================ */
 
-.custom-button:hover {
-  background-color: #f4f4f4;
-}
-
-.button-icon {
-  font-size: 22px;
-  line-height: 1;
-  display: inline-block;
-  transform: translateY(-1px);
-}
-
-#about-toggle:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-}
-
-/* Limit popup size and make contents scroll if too long */
+/* Prevent Leaflet wrapper from being the scroller */
 .leaflet-popup-content {
-  max-height: 220px;   /* adjust for your needs */
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
 }
 
+/* Make only the EV popup content scroll */
+.ev-popup {
+  max-height: 220px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+}
+
+/* Keep inner UL from creating its own scroll context */
+.ev-popup ul {
+  margin: 0.5rem 0 0 1.2rem;
+  padding: 0;
+  overflow: visible;
+}
