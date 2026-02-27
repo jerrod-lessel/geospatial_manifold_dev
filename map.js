@@ -462,7 +462,7 @@ var calFireLayer = L.esri.featureLayer({
     if (acres >= 10000) iconDetails = { size: 60, className: 'fire-icon fire-icon-xl' };
     else if (acres >= 1000) iconDetails = { size: 50, className: 'fire-icon fire-icon-lg' };
     else if (acres >= 100) iconDetails = { size: 40, className: 'fire-icon fire-icon-md' };
-    return L.marker(latlng, {
+    return L.(latlng, {
       icon: L.divIcon({
         html: "🔥",
         className: iconDetails.className,
@@ -504,7 +504,7 @@ var allRoadsLayer = L.esri.featureLayer({
 var schoolsLayer = L.esri.featureLayer({
   url: SERVICES.SCHOOLS,
   attribution: 'California Department of Education',
-  pointToLayer: (geojson, latlng) => L.marker(latlng, {
+  pointToLayer: (geojson, latlng) => L.(latlng, {
     icon: L.divIcon({ html: "🏫", className: "school-icon", iconSize: L.point(30, 30) })
   }),
   onEachFeature: function (feature, layer) {
@@ -526,7 +526,7 @@ var schoolsLayer = L.esri.featureLayer({
 var healthCentLayer = L.esri.featureLayer({
   url: SERVICES.HEALTH_CENTERS,
   attribution: 'California Office of Statewide Health Planning and Development',
-  pointToLayer: (geojson, latlng) => L.marker(latlng, {
+  pointToLayer: (geojson, latlng) => L.(latlng, {
     icon: L.divIcon({ html: "🏥", className: "healthCent-icon", iconSize: L.point(30, 30) })
   }),
   onEachFeature: function (feature, layer) {
@@ -544,7 +544,7 @@ var healthCentLayer = L.esri.featureLayer({
 var pubAirport = L.esri.featureLayer({
   url: SERVICES.PUBLIC_AIRPORTS,
   attribution: 'Caltrans Division of Aeronautics',
-  pointToLayer: (geojson, latlng) => L.marker(latlng, {
+  pointToLayer: (geojson, latlng) => L.(latlng, {
     icon: L.divIcon({ html: "✈️", className: "airport-icon", iconSize: L.point(30, 30) })
   }),
   onEachFeature: function (feature, layer) {
@@ -621,7 +621,10 @@ function getChargersInView() {
               <ul>${equipmentInfo}</ul>
             </div>
           `;
-          marker.bindPopup(popupContent).addTo(evChargersLayer);
+          marker.bindPopup(popupContent, {
+            maxHeight: 220,
+            autoPan: true
+          }).addTo(evChargersLayer);
         }
       });
       isLoadingChargers = false;
