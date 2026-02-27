@@ -124,7 +124,7 @@ html, body {
 /* remove default top margin that creates a “mystery gap” */
 #about-panel h3 {
   margin-top: 0;
-  margin-bottom: 0.5rem; /* small, readable spacing */
+  margin-bottom: 0 /* was 0.5rem; small, readable spacing */
 }
 
 /* Simple helper class used all over the site */
