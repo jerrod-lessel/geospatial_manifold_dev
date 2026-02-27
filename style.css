@@ -322,3 +322,43 @@ html, body {
   padding: 0;
   overflow: visible;
 }
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;   /* banner on top, container below */
+  min-height: 100vh;
+  overflow: hidden;          /* prevents page-level scrollbars */
+}
+
+/* Banner should only be as tall as its content */
+#top-banner {
+  flex: 0 0 auto;
+  height: auto;
+}
+
+/* Container takes the remaining height of the viewport */
+#container {
+  flex: 1 1 auto;
+  height: auto !important;   /* overrides calc(100vh - 80px) */
+  min-height: 0;             /* critical: allows children to size properly */
+  overflow: hidden;
+}
+
+/* Ensure map and sidebar are allowed to shrink properly inside flex */
+#map,
+#sidebar {
+  min-height: 0;
+}
+
+/* If your logo is showing as a giant "favicon", clamp it hard */
+#site-logo {
+  height: 45px !important;
+  width: auto !important;
+  max-height: 45px !important;
+  object-fit: contain;
+}
