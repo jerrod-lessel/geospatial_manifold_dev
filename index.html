@@ -1,84 +1,138 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
+  <!-- =========================================================
+       BASIC PAGE METADATA
+       ========================================================= -->
   <meta charset="utf-8" />
-  <title>Geospatial Manifold</title>
-  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
 
-  <!-- Leaflet Core -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Title shown in browser tab -->
+  <title>Risk GeoNavigator</title>
 
-  <!-- Leaflet-Geoman -->
-  <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
-  <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+  <!-- =========================================================
+       FAVICON
+       - Replace favicon.png with your own file if you want
+       ========================================================= -->
+  <link rel="icon" type="image/png" href="favicon.png" />
 
-  <!-- Esri Leaflet -->
-  <script src="https://unpkg.com/esri-leaflet/dist/esri-leaflet.js"></script>
+  <!-- =========================================================
+       LEAFLET CSS (REQUIRED)
+       - Leaflet styles for the map tiles, controls, popups, etc.
+       ========================================================= -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
 
-  <!-- Turf.js -->
-  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-
-  <!-- Load GeoRaster and GeoRasterLayer -->
-  <script src="https://unpkg.com/georaster"></script>
-  <script src="https://unpkg.com/georaster-layer-for-leaflet"></script>
-
-  <!-- Proj4 (in case needed) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js"></script>
-
-  <!-- Meta Viewport -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- Style -->
+  <!-- =========================================================
+       YOUR SITE CSS (THIS FILE)
+       ========================================================= -->
   <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
-  <!-- Top Banner -->
-<div id="top-banner">
-  <div id="left-banner">
-    <img id="site-logo" src="logo.png" alt="Site Logo">
-    <div id="titles">
-      <span id="main-title">Geospatial Manifold</span>
-      <span id="subtitle">Mapping risks, resources, and resilience across California</span>
-    </div>
-  </div>
-  <button id="about-toggle">About</button>
-</div>
-  
-<div id="about-panel" class="hidden">
-  <h3>About Geospatial Manifold</h3>
-  <p>
-    Welcome to Geospatial Manifold! Your tool for exploring hazard, health, and resilience data across California. 
-    This interactive map lets you see environmental conditions and community risks in your area or anywhere in the state. 
-    Use the layers and controls to learn more and make informed decisions.
-  </p>
-    <p>
-    The data behind this map comes from trusted sources, including CAL FIRE, the California Office of Environmental Health Hazard Assessment (OEHHA), the California Geological Survey, the U.S. Geological Survey (USGS), and FEMA.
-  </p>
-  <p>
-    Geospatial Manifold was created by Jerrod Lessel, a geospatial analyst at Caltrans who lives on California’s Central Coast. This project aims to help Californians better understand the risks and strengths of their communities.
-  </p>
-</div>
-  
-  <!-- Main Container -->
-  <div id="container">
-    <!-- Sidebar -->
-    <div id="sidebar">
-      <div id="loading-spinner" class="hidden">
-      <div class="spinner"></div>
-      </div>
-      <h2>Location Report</h2>
-      <div id="report-content">
-        <em>Click on the map to load data.</em>
+  <!-- =========================================================
+       TOP BANNER / HEADER
+       - Stays sticky at the top
+       - Houses logo, title/subtitle, and About toggle button
+       ========================================================= -->
+  <header id="top-banner">
+    <!-- Left side: logo + titles -->
+    <div id="left-banner">
+      <!-- Logo image (optional). If you don’t want a logo, remove this <img>. -->
+      <img id="site-logo" src="favicon.png" alt="Site logo" />
+
+      <!-- Titles container -->
+      <div id="titles">
+        <!-- Main title -->
+        <div id="main-title">Risk GeoNavigator</div>
+
+        <!-- Subtitle -->
+        <div id="subtitle">California hazard + infrastructure explorer</div>
       </div>
     </div>
 
-    <!-- Map -->
-    <div id="map"></div>
-  </div> <!-- ✅ Correctly closed container -->
-  
-  <!-- Main JS -->
+    <!-- Right side: About button -->
+    <button id="about-toggle" type="button" aria-controls="about-panel" aria-expanded="false">
+      About
+    </button>
+  </header>
+
+  <!-- =========================================================
+       ABOUT PANEL (COLLAPSIBLE)
+       - Hidden by default using .hidden
+       - map.js toggles this panel on click
+       ========================================================= -->
+  <section id="about-panel" class="hidden">
+    <h3>About</h3>
+    <p>
+      This site combines statewide hazard layers (fire, flood, landslide, earthquake shaking) with
+      infrastructure and environmental indicators to help explore location context.
+    </p>
+    <p>
+      Disclaimer: This map is informational. Always consult official sources and local guidance for
+      planning, emergency response, and permitting decisions.
+    </p>
+  </section>
+
+  <!-- =========================================================
+       MAIN LAYOUT CONTAINER
+       - Two columns on desktop:
+           Sidebar (left) + Map (right)
+       - Stacks on mobile via CSS media query
+       ========================================================= -->
+  <div id="container">
+    <!-- =====================
+         SIDEBAR
+         ===================== -->
+    <aside id="sidebar">
+      <h2>Report</h2>
+
+      <!-- Where click report text appears -->
+      <div id="report-content">
+        Click on the map to generate a hazard + context report.
+      </div>
+    </aside>
+
+    <!-- =====================
+         MAP AREA
+         ===================== -->
+    <main id="map-wrap">
+      <!-- Leaflet requires a dedicated div container -->
+      <div id="map"></div>
+
+      <!-- Loading spinner overlay
+           - map.js shows/hides this while queries are running
+           - positioned over the sidebar edge for a "centered" look -->
+      <div id="loading-spinner" class="hidden" aria-hidden="true">
+        <div class="spinner"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- =========================================================
+       JS LIBRARIES (ORDER MATTERS)
+       ========================================================= -->
+
+  <!-- Leaflet JS (REQUIRED) -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <!-- Esri Leaflet (REQUIRED for FeatureServer/MapServer layers) -->
+  <script src="https://unpkg.com/esri-leaflet@3.0.14/dist/esri-leaflet.js"></script>
+
+  <!-- Turf.js (REQUIRED for nearest-edge distance calculations) -->
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+
+  <!-- =========================================================
+       YOUR MAIN APP SCRIPT
+       ========================================================= -->
   <script src="map.js"></script>
 </body>
 </html>
