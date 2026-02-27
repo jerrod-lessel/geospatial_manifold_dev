@@ -117,8 +117,14 @@ html, body {
 #about-panel {
   background: #5A5A5A;
   color: #eeeeee;
-  padding: 1rem;
+  padding: 0.5rem 1rem 1rem; /* top, left/right, bottom */
   font-size: 0.95rem;
+}
+
+/* remove default top margin that creates a “mystery gap” */
+#about-panel h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem; /* small, readable spacing */
 }
 
 /* Simple helper class used all over the site */
