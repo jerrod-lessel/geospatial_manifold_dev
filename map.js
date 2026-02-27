@@ -963,6 +963,20 @@ function addLegendControls(map) {
     
         <div class="legend-section">
           <strong>Landslide Susceptibility (CGS)</strong>
+        
+          <div class="legend-ramp">
+            <span class="ramp-swatch" style="background:#ffffc5;"></span>
+            <span class="ramp-swatch" style="background:#f8d58b;"></span>
+            <span class="ramp-swatch" style="background:#f3ae3d;"></span>
+            <span class="ramp-swatch" style="background:#db9b36;"></span>
+            <span class="ramp-swatch" style="background:#ec622b;"></span>
+            <span class="ramp-swatch" style="background:#d32d1f;"></span>
+            <span class="ramp-swatch" style="background:#9a1e13;"></span>
+          </div>
+          <div class="legend-ramp-labels">
+            <span>Lower</span><span>Higher</span>
+          </div>
+
           <div style="display:block; margin-top:6px;">
             Relative susceptibility classes. Higher classes generally indicate terrain more prone to slope failure
             under triggers like intense rainfall, earthquakes, and drainage changes.
@@ -971,6 +985,20 @@ function addLegendControls(map) {
     
         <div class="legend-section">
           <strong>Shaking Potential (MMI, 10% in 50 years)</strong>
+        
+          <div class="legend-ramp">
+            <span class="ramp-swatch" style="background:rgb(255,255,191);"></span>
+            <span class="ramp-swatch" style="background:rgb(245,245,0);"></span>
+            <span class="ramp-swatch" style="background:rgb(247,206,0);"></span>
+            <span class="ramp-swatch" style="background:rgb(250,125,0);"></span>
+            <span class="ramp-swatch" style="background:rgb(253,42,0);"></span>
+            <span class="ramp-swatch" style="background:rgb(199,8,8);"></span>
+            <span class="ramp-swatch" style="background:rgb(140,8,8);"></span>
+          </div>
+          <div class="legend-ramp-labels">
+            <span>MMI 4</span><span>MMI 10+</span>
+          </div>
+        
           <div style="display:block; margin-top:6px;">
             Modified Mercalli Intensity estimated from ground motion (PGV). Higher values generally mean stronger shaking
             and greater potential for damage.
@@ -978,7 +1006,24 @@ function addLegendControls(map) {
         </div>
     
         <div class="legend-section">
-          <strong>CalEnviroScreen Indicators</strong>
+          <strong>CalEnviroScreen Indicators (Percentile)</strong>
+        
+          <div class="legend-ramp">
+            <span class="ramp-swatch" style="background:#ffffcc;"></span>
+            <span class="ramp-swatch" style="background:#f7fbff;"></span>
+            <span class="ramp-swatch" style="background:#deebf7;"></span>
+            <span class="ramp-swatch" style="background:#c6dbef;"></span>
+            <span class="ramp-swatch" style="background:#9ecae1;"></span>
+            <span class="ramp-swatch" style="background:#6baed6;"></span>
+            <span class="ramp-swatch" style="background:#4292c6;"></span>
+            <span class="ramp-swatch" style="background:#2171b5;"></span>
+            <span class="ramp-swatch" style="background:#08519c;"></span>
+            <span class="ramp-swatch" style="background:#08306b;"></span>
+          </div>
+          <div class="legend-ramp-labels">
+            <span>0–10</span><span>90–100</span>
+          </div>
+        
           <div style="display:block; margin-top:6px;">
             Percentiles compare census tracts statewide. Higher percentiles generally indicate higher burden/worse conditions.
             The map report shows both the raw value (when available) and the percentile.
@@ -1261,10 +1306,10 @@ Percentile: <strong>${pct}</strong>`;
         const mmi = await identifyMMIAt(e.latlng);
         if (mmi != null) {
           const fmt = formatMMI(mmi);
-          results.shaking = `■ <strong>Shaking Potential:</strong> <strong>${fmt.valueStr}</strong> (${fmt.label})`;
+          results.shaking = fmtShaking(mmi, fmt);
         }
       } catch (err2) {
-        results.shaking = fmtShaking(mmi, fmt);
+        results.shaking = "■ <strong>Shaking Potential:</strong> Error fetching value.";
       } finally {
         checkDone();
       }
