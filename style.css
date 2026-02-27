@@ -362,3 +362,58 @@ body {
   max-height: 45px !important;
   object-fit: contain;
 }
+
+#top-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
+  padding: 0.75rem 1rem;
+  border-bottom: 2px solid #0f2027;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  color: white;
+  gap: 0.75rem; /* helps spacing */
+}
+
+/* Left side: logo + titles */
+#left-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0; /* prevents weird overflow pushing stuff */
+}
+
+/* Titles must stack */
+#titles,
+#title-container {
+  display: flex;
+  flex-direction: column;     /* <-- this is the key */
+  align-items: flex-start;
+  line-height: 1.1;
+  min-width: 0;
+}
+
+/* Make sure title and subtitle are block-ish and don’t “flex row” */
+#main-title,
+#subtitle {
+  display: block;
+  white-space: nowrap;        /* keep each on one line */
+}
+
+/* If your screen gets narrow, allow wrapping instead of breaking layout */
+@media (max-width: 520px) {
+  #main-title,
+  #subtitle {
+    white-space: normal;
+  }
+}
+
+/* Logo sanity clamp (prevents giant icon situation) */
+#site-logo {
+  height: 45px !important;
+  width: auto !important;
+  max-height: 45px !important;
+  object-fit: contain;
+}
