@@ -937,38 +937,66 @@ function addLegendControls(map) {
     div.addEventListener("touchmove", (e) => e.stopPropagation(), { passive: false });
     div.addEventListener("wheel", (e) => e.stopPropagation(), { passive: false });
 
-    div.innerHTML = `
-      <h2>Legends</h2>
-      <div class="legend-section">
-        <strong>Fire Hazard Zones</strong>
-        <div><i style="background:#d7191c;"></i> Very High</div>
-        <div><i style="background:#fdae61;"></i> High</div>
-        <div><i style="background:#ffffbf;"></i> Moderate</div>
-      </div>
-      <div class="legend-section">
-        <strong>Flood Zones</strong>
-        <div><i style="background:#f03b20;"></i> 1% Annual Chance Flood Hazard</div>
-        <div><i style="background:#feb24c;"></i> 0.2% Annual Chance Flood Hazard</div>
-        <div><i style="background:#e5d099;"></i> Area with Reduced Risk Due to Levee</div>
-        <div><i style="background:#769ccd;"></i> Regulatory Floodway</div>
-      </div>
-      <div class="legend-section">
-        <strong>Ozone</strong>
-        <div>Summer daily max 8-hour ozone (ppm).</div>
-      </div>
-      <div class="legend-section">
-        <strong>PM2.5</strong>
-        <div>Annual concentration (µg/m³).</div>
-      </div>
-      <div class="legend-section">
-        <strong>Drinking Water Contaminants</strong>
-        <div>Sum of contaminant + violation percentiles.</div>
-      </div>
-      <div class="legend-section">
-        <strong>Shaking Potential</strong>
-        <div>MMI estimated from PGV.</div>
-      </div>
-    `;
+      div.innerHTML = `
+        <h2>Legends</h2>
+    
+        <div class="legend-section">
+          <strong>Fire Hazard Severity Zones</strong>
+          <div><i style="background:#d7191c;"></i> Very High</div>
+          <div><i style="background:#fdae61;"></i> High</div>
+          <div><i style="background:#ffffbf;"></i> Moderate</div>
+          <div style="display:block; margin-top:6px;">
+            These zones describe expected fire behavior based on fuels, terrain, and typical fire weather.
+          </div>
+        </div>
+    
+        <div class="legend-section">
+          <strong>Flood Zones (FEMA NFHL)</strong>
+          <div><i style="background:#f03b20;"></i> 1% Annual Chance Flood Hazard</div>
+          <div><i style="background:#feb24c;"></i> 0.2% Annual Chance Flood Hazard</div>
+          <div><i style="background:#e5d099;"></i> Reduced Risk Due to Levee</div>
+          <div><i style="background:#769ccd;"></i> Regulatory Floodway</div>
+          <div style="display:block; margin-top:6px;">
+            Flood zones indicate mapped flood risk areas used for planning and flood insurance guidance.
+          </div>
+        </div>
+    
+        <div class="legend-section">
+          <strong>Landslide Susceptibility (CGS)</strong>
+          <div style="display:block; margin-top:6px;">
+            Relative susceptibility classes. Higher classes generally indicate terrain more prone to slope failure
+            under triggers like intense rainfall, earthquakes, and drainage changes.
+          </div>
+        </div>
+    
+        <div class="legend-section">
+          <strong>Shaking Potential (MMI, 10% in 50 years)</strong>
+          <div style="display:block; margin-top:6px;">
+            Modified Mercalli Intensity estimated from ground motion (PGV). Higher values generally mean stronger shaking
+            and greater potential for damage.
+          </div>
+        </div>
+    
+        <div class="legend-section">
+          <strong>CalEnviroScreen Indicators</strong>
+          <div style="display:block; margin-top:6px;">
+            Percentiles compare census tracts statewide. Higher percentiles generally indicate higher burden/worse conditions.
+            The map report shows both the raw value (when available) and the percentile.
+          </div>
+          <div style="display:block; margin-top:6px;">
+            <em>Ozone:</em> summer-season ozone summary.<br>
+            <em>PM2.5:</em> annual average fine particulates.<br>
+            <em>Drinking Water:</em> combined contaminant + violation score.
+          </div>
+        </div>
+    
+        <div class="legend-section">
+          <strong>Active Fires</strong>
+          <div style="display:block; margin-top:6px;">
+            Current incident points from WFIGS/NIFC. Popup includes size, containment, and last update time.
+          </div>
+        </div>
+      `;
     return div;
   };
   legendPanel.addTo(map);
@@ -1016,6 +1044,44 @@ function installClickReport(map, layers) {
       shaking: "❌ Shaking Potential: No data.",
     };
 
+    // ===============================
+    // Report formatting helpers (keeps output consistent + easy to expand later)
+    // ===============================
+    function fmtNoData(title) {
+      return `❌ <strong>${title}:</strong> No data at this location.`;
+    }
+  
+    function fmtFireInside(zone, whichArea /* "SRA" or "LRA" */) {
+      return `■ <strong>Fire Hazard Zone (${whichArea}):</strong><br>
+  This location is within a <strong>${zone}</strong> Fire Hazard Severity Zone.<br>
+  These zones reflect expected fire behavior based on fuels, terrain, and typical fire weather, and are used to guide planning and mitigation.`;
+    }
+  
+    function fmtFloodInside(zone) {
+      return `■ <strong>Flood Hazard Zone:</strong><br>
+  This location is within <strong>${zone}</strong> (FEMA NFHL).<br>
+  Flood zones represent areas with varying flood probabilities and are used for floodplain management, insurance, and development decisions.`;
+    }
+  
+    function fmtCalEnviro(title, valueStr, pctStr, noteStr) {
+      return `■ <strong>${title}:</strong><br>
+  <strong>Value:</strong> ${valueStr}<br>
+  <strong>Percentile:</strong> ${pctStr}<br>
+  <span style="opacity:0.9">${noteStr}</span>`;
+    }
+  
+    function fmtLandslide(label) {
+      return `■ <strong>Landslide Susceptibility:</strong><br>
+  Class <strong>${label}</strong> (California Geological Survey).<br>
+  Higher classes generally indicate terrain more prone to slope failure under triggers like intense rainfall, earthquakes, and drainage changes.`;
+    }
+  
+    function fmtShaking(mmi, fmt) {
+      return `■ <strong>Shaking Potential (MMI, 10%/50yr):</strong><br>
+  Estimated intensity: <strong>${fmt.valueStr}</strong> (${fmt.label}).<br>
+  MMI is a human-impact scale: higher values generally mean stronger shaking and greater potential for damage.`;
+    }
+    
     let completed = 0;
     const totalTasks = Object.keys(results).length;
 
@@ -1078,16 +1144,14 @@ function installClickReport(map, layers) {
         const lraRes = await queryContains(layers.fireHazardLRA, e.latlng);
         if (!lraRes.err && lraRes.fc?.features?.length) {
           const zone = lraRes.fc.features[0].properties.FHSZ_Description;
-          results.fire = `■ <strong>Fire Hazard Zone (LRA):</strong><br>
-This area falls within a <strong>${zone}</strong> fire hazard zone (Local Responsibility Area).`;
+          results.fire = fmtFireInside(zone, "LRA");
           return;
         }
 
         const sraRes = await queryContains(layers.fireHazardSRA, e.latlng);
         if (!sraRes.err && sraRes.fc?.features?.length) {
           const zone = sraRes.fc.features[0].properties.FHSZ_Description;
-          results.fire = `■ <strong>Fire Hazard Zone (SRA):</strong><br>
-This area falls within a <strong>${zone}</strong> fire hazard zone (State Responsibility Area).`;
+          results.fire = fmtFireInside(zone, "SRA");
           return;
         }
 
@@ -1112,8 +1176,7 @@ This area falls within a <strong>${zone}</strong> fire hazard zone (State Respon
       try {
         if (!err && fc.features.length > 0) {
           const zone = fc.features[0].properties.ESRI_SYMBOLOGY;
-          results.flood = `■ <strong>Flood Hazard Zone:</strong><br>
-This location falls within a <strong>${zone}</strong> (FEMA NFHL).`;
+          results.flood = fmtFloodInside(zone);
         } else {
           getClosestFeatureByEdgeDistance(layers.floodLayer, e.latlng, "Flood Hazard Zone", "ESRI_SYMBOLOGY", [], (txt) => {
             results.flood = txt + `<br><em>Note: FEMA flood zones guide insurance and floodplain decisions.</em>`;
@@ -1183,7 +1246,7 @@ Percentile: <strong>${pct}</strong>`;
       try {
         const label = await identifyLandslideAt(map, e.latlng);
         if (label) {
-          results.landslide = `■ <strong>Landslide Susceptibility:</strong> Class <strong>${label}</strong>`;
+          results.landslide = fmtLandslide(label);
         }
       } catch (err2) {
         results.landslide = "■ <strong>Landslide Susceptibility:</strong> Error fetching value.";
@@ -1201,7 +1264,7 @@ Percentile: <strong>${pct}</strong>`;
           results.shaking = `■ <strong>Shaking Potential:</strong> <strong>${fmt.valueStr}</strong> (${fmt.label})`;
         }
       } catch (err2) {
-        results.shaking = "■ <strong>Shaking Potential:</strong> Error fetching value.";
+        results.shaking = fmtShaking(mmi, fmt);
       } finally {
         checkDone();
       }
