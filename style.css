@@ -1,37 +1,83 @@
+/* ============================================================================
+   style.css - Site styling for Risk GeoNavigator
+
+   GOALS:
+   - Full viewport app layout (no page scrolling)
+   - Sticky top banner
+   - Sidebar + map split layout
+   - Rounded corners and subtle borders
+   - Avoid "double scrollbars" in Leaflet popups
+   - Mobile stacking layout under 768px
+============================================================================ */
+
+/* ============================================================================
+   1) GLOBAL PAGE RESET
+============================================================================ */
+
 html, body {
   margin: 0;
   padding: 0;
+
+  /* Make sure the app can fill full screen height */
   height: 100%;
+
+  /* Global font choice */
   font-family: Arial, sans-serif;
+
+  /* IMPORTANT:
+     We generally want the app to manage its own scroll regions
+     (sidebar content, legend panel, popups). Prevent global body scrolling. */
   overflow: hidden;
+
+  /* Background color visible if something fails (black) */
   background-color: black;
 }
 
+/* ============================================================================
+   2) TOP BANNER / HEADER
+============================================================================ */
+
 #top-banner {
   display: flex;
-  justify-content: space-between;
+  justify-content: space-between; /* left side + about button */
   align-items: center;
+
   background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
+
+  /* This padding is what gives it that "banner" spacing */
   padding: 0.75rem 1rem;
-  font-size: 2rem;
-  font-weight: bold;
+
   border-bottom: 2px solid #0f2027;
+
+  /* Sticky keeps it visible at top */
   position: sticky;
   top: 0;
   z-index: 1000;
+
   color: white;
-  text-shadow:
-    -1px -1px 0 #000,
-     1px -1px 0 #000,
-    -1px  1px 0 #000,
-     1px  1px 0 #000;
 }
 
-#title-container {
+/* Left side grouping: logo + titles */
+#left-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem; /* space between logo and text */
+}
+
+/* Site logo sizing */
+#site-logo {
+  height: 45px;
+  width: auto;
+}
+
+/* Titles stack vertically */
+#titles {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
 }
 
+/* Main title styling */
 #main-title {
   font-size: 1.5rem;
   font-weight: bold;
@@ -43,6 +89,13 @@ html, body {
      1px  1px 0 #000;
 }
 
+/* Subtitle styling */
+#subtitle {
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+/* About button */
 #about-toggle {
   background-color: rgba(255, 255, 255, 0.1);
   color: #fff;
@@ -57,89 +110,137 @@ html, body {
   background-color: rgba(255, 255, 255, 0.2);
 }
 
+/* ============================================================================
+   3) ABOUT PANEL
+============================================================================ */
+
 #about-panel {
   background: #5A5A5A;
+  color: #eeeeee;
   padding: 1rem;
   font-size: 0.95rem;
-  color: #eeeeee;
 }
 
-#about-panel h3 {
-  margin-top: 0;
-}
-
+/* Simple helper class used all over the site */
 .hidden {
   display: none;
 }
 
-#subtitle {
-  font-size: 0.85rem;
-  opacity: 0.85;
-}
+/* ============================================================================
+   4) MAIN APP LAYOUT: SIDEBAR + MAP
+============================================================================ */
 
+/* Container holds sidebar + map */
 #container {
   display: flex;
+
+  /* Take the viewport height minus header height.
+     If you change header padding/font-size, adjust this 80px. */
   height: calc(100vh - 80px);
+
   width: 100%;
   border: 3px solid black;
+
+  /* Prevent random scroll bars from layout overflow */
   overflow: hidden;
+
   background-color: #000000;
 }
 
+/* Sidebar (left) */
 #sidebar {
   width: 300px;
   padding: 15px;
+
   display: flex;
   flex-direction: column;
+
   box-sizing: border-box;
+
+  /* Sidebar scrolls internally */
   overflow-y: auto;
-  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+
+  /* Must fill its available height to avoid weird scrolling */
   max-height: 100%;
+
+  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+
   border-radius: 13px;
   background-color: #5A5A5A;
   color: #eeeeee;
 }
 
-#map {
-  flex-grow: 1;
-  height: 100%;
-  border: 2px solid black;
-  position: relative;
-  z-index: 1;
-  border-radius: 13px;
-  overflow: hidden;
-}
-
+/* Report text area can grow and scroll if needed */
 #report-content {
   font-size: 0.95rem;
   line-height: 1.4;
   margin-top: 10px;
+
+  /* Let it use remaining vertical space */
   flex-grow: 1;
+
+  /* internal scrolling */
   overflow-y: auto;
 }
 
-.map-widget {
-  background-color: #fff;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-shadow: 0 1px 5px rgba(0,0,0,0.65);
-  width: 43px;
-  height: 43px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
+/* Map wrapper (right side) - contains the map + spinner overlay */
+#map-wrap {
+  flex-grow: 1;
+  position: relative; /* required so spinner can be positioned inside */
 }
 
-.map-widget svg {
-  width: 20px;
-  height: 20px;
+/* Leaflet map container must have a defined size */
+#map {
+  height: 100%;
+  width: 100%;
+
+  border: 2px solid black;
+  border-radius: 13px;
+
+  /* Stops map tiles from spilling outside rounded corners */
+  overflow: hidden;
+
+  position: relative;
+  z-index: 1;
 }
 
-.map-widget:hover {
-  background-color: #f4f4f4;
+/* ============================================================================
+   5) LOADING SPINNER
+============================================================================ */
+
+#loading-spinner {
+  position: absolute;
+
+  /* Center vertically */
+  top: 50%;
+
+  /* This places it near the sidebar border.
+     If you change sidebar width, adjust this.
+     (300px sidebar -> 150px is its halfway point) */
+  left: 150px;
+
+  transform: translate(-50%, -50%);
+  z-index: 2000;
 }
+
+.spinner {
+  border: 8px solid #f3f3f3;
+  border-top: 8px solid #2c5364;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ============================================================================
+   6) LEAFLET CONTROL BUTTON STYLES
+   - Matches your “nice white control” look
+============================================================================ */
 
 .home-button {
   width: 30px;
@@ -149,6 +250,7 @@ html, body {
   border-radius: 4px;
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
   cursor: pointer;
+
   display: flex;
   align-items: center;
   justify-content: center;
@@ -158,11 +260,15 @@ html, body {
 #home-button .legend-icon {
   font-size: 25px;
   line-height: 1;
+
   display: flex;
   align-items: center;
   justify-content: center;
+
   width: 100%;
   height: 100%;
+
+  /* tiny vertical nudge to look centered */
   transform: translateY(-2px);
 }
 
@@ -173,9 +279,11 @@ html, body {
   border: 1px solid #ccc;
   border-radius: 4px;
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
+
   display: flex;
   align-items: center;
   justify-content: center;
+
   cursor: pointer;
 }
 
@@ -189,20 +297,34 @@ html, body {
   transform: translateY(-2px);
 }
 
+/* ============================================================================
+   7) LEGEND PANEL
+============================================================================ */
+
 .legend-panel {
   background: #fff;
   padding: 10px;
   border: 2px solid #000;
   border-radius: 4px;
+
   max-height: 70vh;
-  overflow-y: auto;
   width: 250px;
+
   font-size: 0.9rem;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+
   z-index: 999;
-  touch-action: auto;
-  overscroll-behavior: contain;
+
+  /* Allows internal scrolling without page scroll */
+  overflow-y: auto;
+
+  /* iOS smooth scrolling */
   -webkit-overflow-scrolling: touch;
+
+  /* Helps prevent scroll chaining weirdness */
+  overscroll-behavior: contain;
+  touch-action: auto;
+
   padding-bottom: 1rem;
 }
 
@@ -224,6 +346,23 @@ html, body {
   border: 1px solid #888;
 }
 
+/* Optional: custom scrollbar styling (Chromium/WebKit only) */
+.legend-panel::-webkit-scrollbar {
+  width: 8px;
+}
+.legend-panel::-webkit-scrollbar-thumb {
+  background-color: #888;
+  border-radius: 4px;
+}
+.legend-panel::-webkit-scrollbar-thumb:hover {
+  background-color: #555;
+}
+
+/* ============================================================================
+   8) ICON SIZES (Emoji markers)
+   - These class names match map.js divIcon usage
+============================================================================ */
+
 .school-icon,
 .university-icon,
 .healthCent-icon,
@@ -236,6 +375,7 @@ html, body {
   line-height: 1;
 }
 
+/* Fire emoji helper to center nicely */
 .fire-icon {
   display: flex;
   justify-content: center;
@@ -243,177 +383,65 @@ html, body {
   line-height: 1;
 }
 
+/* Fire icon size categories */
 .fire-icon-sm { font-size: 15px; }
 .fire-icon-md { font-size: 25px; }
 .fire-icon-lg { font-size: 40px; }
 .fire-icon-xl { font-size: 50px; }
 
-@media (max-width: 768px) {
-  #container { flex-direction: column; }
+/* ============================================================================
+   9) POPUP SCROLLBAR FIX (VERY IMPORTANT)
+   - Prevent “double scrollbars” inside Leaflet popups
+   - Strategy:
+       * Leaflet popup container: do NOT scroll.
+       * Only your inner .ev-popup can scroll.
+============================================================================ */
 
-  .legend-panel {
-    max-height: 65vh;
-    overflow-y: scroll;
-    padding-bottom: 2rem;
+/* Leaflet’s default popup content wrapper */
+.leaflet-popup-content {
+  /* Avoid forcing scroll on Leaflet’s wrapper */
+  max-height: none;
+  overflow: visible;
+}
+
+/* Your EV popup wrapper inside popupContent */
+.ev-popup {
+  /* The inner content gets the scrolling, not Leaflet itself */
+  max-height: 220px;    /* should match UI.POPUP_MAX_HEIGHT */
+  overflow-y: auto;
+
+  /* Helps reduce weird iOS bounce + chaining */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+
+  /* Optional: small padding so the scrollbar doesn’t sit on text */
+  padding-right: 6px;
+}
+
+/* ============================================================================
+   10) MOBILE RESPONSIVE LAYOUT
+============================================================================ */
+
+@media (max-width: 768px) {
+  /* Stack sidebar on top, map below */
+  #container {
+    flex-direction: column;
   }
 
+  /* Sidebar becomes full width and partial height */
   #sidebar {
     width: 100%;
     height: 45vh;
     border-right: none;
   }
 
+  /* Map takes remaining space */
   #map {
-    height: calc(100vh - 80px - 300px);
+    height: calc(100vh - 80px - 45vh);
   }
 
-  #report-content {
-    max-height: 100%;
-    overflow-y: auto;
-    touch-action: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
+  /* Legend panel: slightly taller scrolling area */
+  .legend-panel {
+    max-height: 65vh;
   }
-}
-
-#loading-spinner {
-  position: absolute;
-  top: 50%;
-  left: 150px;
-  transform: translate(-50%, -50%);
-  z-index: 2000;
-}
-
-.spinner {
-  border: 8px solid #f3f3f3;
-  border-top: 8px solid #2c5364;
-  border-radius: 50%;
-  width: 30px;
-  height: 30px;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* ============================
-   EV POPUP: SINGLE SCROLLBAR FIX
-   ============================ */
-
-/* Prevent Leaflet wrapper from being the scroller */
-.leaflet-popup-content {
-  max-height: none;
-  overflow: visible;
-}
-
-/* Make only the EV popup content scroll */
-.ev-popup {
-  max-height: 220px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 6px;
-}
-
-/* Keep inner UL from creating its own scroll context */
-.ev-popup ul {
-  margin: 0.5rem 0 0 1.2rem;
-  padding: 0;
-  overflow: visible;
-}
-
-html, body {
-  height: 100%;
-}
-
-body {
-  margin: 0;
-  display: flex;
-  flex-direction: column;   /* banner on top, container below */
-  min-height: 100vh;
-  overflow: hidden;          /* prevents page-level scrollbars */
-}
-
-/* Banner should only be as tall as its content */
-#top-banner {
-  flex: 0 0 auto;
-  height: auto;
-}
-
-/* Container takes the remaining height of the viewport */
-#container {
-  flex: 1 1 auto;
-  height: auto !important;   /* overrides calc(100vh - 80px) */
-  min-height: 0;             /* critical: allows children to size properly */
-  overflow: hidden;
-}
-
-/* Ensure map and sidebar are allowed to shrink properly inside flex */
-#map,
-#sidebar {
-  min-height: 0;
-}
-
-/* If your logo is showing as a giant "favicon", clamp it hard */
-#site-logo {
-  height: 45px !important;
-  width: auto !important;
-  max-height: 45px !important;
-  object-fit: contain;
-}
-
-#top-banner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
-  padding: 0.75rem 1rem;
-  border-bottom: 2px solid #0f2027;
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  color: white;
-  gap: 0.75rem; /* helps spacing */
-}
-
-/* Left side: logo + titles */
-#left-banner {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0; /* prevents weird overflow pushing stuff */
-}
-
-/* Titles must stack */
-#titles,
-#title-container {
-  display: flex;
-  flex-direction: column;     /* <-- this is the key */
-  align-items: flex-start;
-  line-height: 1.1;
-  min-width: 0;
-}
-
-/* Make sure title and subtitle are block-ish and don’t “flex row” */
-#main-title,
-#subtitle {
-  display: block;
-  white-space: nowrap;        /* keep each on one line */
-}
-
-/* If your screen gets narrow, allow wrapping instead of breaking layout */
-@media (max-width: 520px) {
-  #main-title,
-  #subtitle {
-    white-space: normal;
-  }
-}
-
-/* Logo sanity clamp (prevents giant icon situation) */
-#site-logo {
-  height: 45px !important;
-  width: auto !important;
-  max-height: 45px !important;
-  object-fit: contain;
 }
