@@ -1,5 +1,5 @@
 /* ============================================================================
-  map.js - Risk GeoNavigator (Leaflet + Esri Leaflet)
+  map.js - Geospatial Manifold (Leaflet + Esri Leaflet)
 
   WHAT THIS FILE DOES:
   - Initializes the map + basemap options
@@ -41,6 +41,8 @@ const SERVICES = {
     "https://gis.conservation.ca.gov/server/rest/services/CGS/MS58_LandslideSusceptibility_Classes/MapServer",
   SHAKING_IMAGESERVER:
     "https://gis.conservation.ca.gov/server/rest/services/CGS/MS48_MMI_PGV_10pc50/ImageServer",
+  FAULTS_MAPSERVER: 
+    "https://gis.conservation.ca.gov/server/rest/services/CGS/FaultActivityMapCA/MapServer",
 
   // Fire Hazard Severity Zones
   FIRE_SRA:
@@ -427,6 +429,15 @@ function createLandslideVisualLayer() {
   return L.esri.dynamicMapLayer({
     url: SERVICES.LANDSLIDE_MAPSERVER,
     opacity: 0.6,
+  });
+}
+
+/** Fault activity visual dynamic layer (CGS Fault Activity Map) */
+function createFaultsVisualLayer() {
+  return L.esri.dynamicMapLayer({
+    url: SERVICES.FAULTS_MAPSERVER,
+    // Slightly higher opacity works well because faults are typically thin linework.
+    opacity: 0.85,
   });
 }
 
@@ -1365,11 +1376,27 @@ function installClickReport(map, layers) {
     // Hazards
     landslideLayer: createLandslideVisualLayer(),
     shakingLayer: createShakingVisualLayer(),
+    faultsLayer: createFaultsVisualLayer(),
     floodLayer: createFloodLayer(),
     fireHazardSRA: fire.fireHazardSRA,
     fireHazardLRA: fire.fireHazardLRA,
     fireHazardLayer: fire.fireHazardLayer,
     activeFires: createActiveFiresLayer(),
+
+    /* =========================================================
+       Ensure faults draw above other visual overlays
+       ---------------------------------------------------------
+       When the faults layer is turned on, bring it to front.
+       This keeps thin fault lines visible above shaded layers
+       like landslide susceptibility.
+    ========================================================= */
+    faultsLayer.on("add", () => {
+      try {
+        faultsLayer.bringToFront();
+      } catch (err) {
+        console.warn("Could not bring faults layer to front:", err);
+      }
+    });
 
     // Env
     ozoneLayer: createCesLayer("ozoneP IS NOT NULL", "ozoneP"),
@@ -1442,6 +1469,7 @@ function installClickReport(map, layers) {
     "Fire Hazard Zones": LAYERS.fireHazardLayer,
     "Flood Hazard Zones": LAYERS.floodLayer,
     "Landslide Susceptibility": LAYERS.landslideLayer,
+    "Falut Locations": LAYERS.faultsLayer,
     "Shaking Potential (MMI, 10%/50yr)": LAYERS.shakingLayer,
     "Active Fires": LAYERS.activeFires,
 
