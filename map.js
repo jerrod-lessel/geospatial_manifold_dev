@@ -1138,27 +1138,31 @@ function addLegendControls(map) {
 
       <div class="legend-section">
         <strong>Flood Hazard Zones (FEMA)</strong>
-      
-        <div class="legend-ramp">
-          <span class="ramp-swatch" style="background:#feb24c;"></span>
-          <span class="ramp-swatch" style="background:#f03b20;"></span>
-          <span class="ramp-swatch" style="background:#769ccd;"></span>
-          <span class="ramp-swatch" style="background:#e5d099;"></span>
+            
+        <div style="display:block; margin-top:6px;">
+          <em>0.2% Annual Chance Flood Hazard</em>
+          <span class="legend-swatch" style="background:#feb24c;"></span>
         </div>
-        <div class="legend-ramp-labels">
-          <span>Hazard</span><span>Other</span>
+        
+        <div style="display:block; margin-top:6px;">
+          <em>1% Annual Chance Flood Hazard</em>
+          <span class="legend-swatch" style="background:#f03b20;"></span>
+        </div>
+        
+        <div style="display:block; margin-top:6px;">
+          <em>Regulatory Floodway</em>
+          <span class="legend-swatch" style="background:#769ccd;"></span>
+        </div>
+      
+        <div style="display:block; margin-top:6px;">
+          <em>Reduced Risk Due to Levee</em>
+          <span class="legend-swatch" style="background:#e5d099;"></span>
         </div>
       
         <div style="display:block; margin-top:6px;">
           FEMA NFHL zones showing flood hazard areas such as the 1% annual chance floodplain and regulatory floodway.
-          Colors match the map symbology used here.
-        </div>
-      
-        <div style="display:block; margin-top:6px;">
-          <em>1% Annual Chance:</em> #f03b20<br>
-          <em>0.2% Annual Chance:</em> #feb24c<br>
-          <em>Floodway:</em> #769ccd<br>
-          <em>Reduced risk due to levee:</em> #e5d099
+          Colors match the map symbology used here. Flood zones indicate mapped flood risk areas used for planning 
+          and flood insurance guidance.
         </div>
       </div>
 
