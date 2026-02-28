@@ -1632,7 +1632,7 @@ MMI is a human-impact scale: higher values generally mean stronger shaking and g
     "Fire Hazard Zones": LAYERS.fireHazardLayer,
     "Flood Hazard Zones": LAYERS.floodLayer,
     "Landslide Susceptibility": LAYERS.landslideLayer,
-    "Faults (Clickable)": LAYERS.faultsLayer,
+    "Faults": LAYERS.faultsLayer,
     "Shaking Potential (MMI, 10%/50yr)": LAYERS.shakingLayer,
     "Active Fires": LAYERS.activeFires,
 
