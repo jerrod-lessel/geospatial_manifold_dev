@@ -1117,25 +1117,7 @@ function addLegendControls(map) {
 
     div.innerHTML = `
       <h2>Legends</h2>
-
-      <div class="legend-section">
-        <strong>Fire Hazard Severity Zones</strong>
       
-        <div class="legend-ramp">
-          <span class="ramp-swatch" style="background:#ffffbf;"></span>
-          <span class="ramp-swatch" style="background:#fdae61;"></span>
-          <span class="ramp-swatch" style="background:#d7191c;"></span>
-        </div>
-        <div class="legend-ramp-labels">
-          <span>Moderate</span><span>Very High</span>
-        </div>
-      
-        <div style="display:block; margin-top:6px;">
-          Fire Hazard Severity Zones indicate relative wildfire hazard based on fuels, terrain, and typical fire weather.
-          (Shown here as the public SRA + LRA layers.)
-        </div>
-      </div>
-
       <div class="legend-section">
         <strong>Flood Hazard Zones (FEMA)</strong>
             
@@ -1163,6 +1145,24 @@ function addLegendControls(map) {
           FEMA NFHL zones showing flood hazard areas such as the 1% annual chance floodplain and regulatory floodway.
           Colors match the map symbology used here. Flood zones indicate mapped flood risk areas used for planning 
           and flood insurance guidance.
+        </div>
+      </div>
+
+      <div class="legend-section">
+        <strong>Fire Hazard Severity Zones</strong>
+        
+        <div class="legend-ramp">
+          <span class="ramp-swatch" style="background:#ffffbf;"></span>
+          <span class="ramp-swatch" style="background:#fdae61;"></span>
+          <span class="ramp-swatch" style="background:#d7191c;"></span>
+        </div>
+        <div class="legend-ramp-labels">
+          <span>Moderate</span><span>Very High</span>
+        </div>
+      
+        <div style="display:block; margin-top:6px;">
+          Fire Hazard Severity Zones indicate relative wildfire hazard based on fuels, terrain, and typical fire weather.
+          (Shown here as the public SRA + LRA layers.)
         </div>
       </div>
 
@@ -1241,14 +1241,6 @@ function addLegendControls(map) {
       </div>
 
       <div class="legend-section">
-        <strong>Faults</strong>
-        <div style="display:block; margin-top:6px;">
-          Click fault lines to see the fault name and age/activity. This layer swaps between “regional” and “local”
-          fault lines as you zoom in/out so you get appropriate detail at each scale.
-        </div>
-      </div>
-
-      <div class="legend-section">
         <strong>Active Fires (WFIGS / NIFC)</strong>
         <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
           <span style="font-size:16px;">🔥</span><span>Small incident</span>
@@ -1261,6 +1253,14 @@ function addLegendControls(map) {
         </div>
         <div style="display:block; margin-top:6px;">
           Symbol size scales with reported fire size (acres) — larger 🔥 generally means a larger incident.
+        </div>
+      </div>
+      
+      <div class="legend-section">
+        <strong>Faults</strong>
+        <div style="display:block; margin-top:6px;">
+          Click fault lines to see the fault name and age/activity. This layer swaps between “regional” and “local”
+          fault lines as you zoom in/out so you get appropriate detail at each scale.
         </div>
       </div>
     `;
