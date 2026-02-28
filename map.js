@@ -1120,22 +1120,45 @@ function addLegendControls(map) {
 
       <div class="legend-section">
         <strong>Fire Hazard Severity Zones</strong>
-        <div><i style="background:#d7191c;"></i> Very High</div>
-        <div><i style="background:#fdae61;"></i> High</div>
-        <div><i style="background:#ffffbf;"></i> Moderate</div>
+      
+        <div class="legend-ramp">
+          <span class="ramp-swatch" style="background:#ffffbf;"></span>
+          <span class="ramp-swatch" style="background:#fdae61;"></span>
+          <span class="ramp-swatch" style="background:#d7191c;"></span>
+        </div>
+        <div class="legend-ramp-labels">
+          <span>Moderate</span><span>Very High</span>
+        </div>
+      
         <div style="display:block; margin-top:6px;">
-          These zones describe expected fire behavior based on fuels, terrain, and typical fire weather.
+          Fire Hazard Severity Zones indicate relative wildfire hazard based on fuels, terrain, and typical fire weather.
+          (Shown here as the public SRA + LRA layers.)
         </div>
       </div>
 
       <div class="legend-section">
-        <strong>Flood Zones (FEMA NFHL)</strong>
-        <div><i style="background:#f03b20;"></i> 1% Annual Chance Flood Hazard</div>
-        <div><i style="background:#feb24c;"></i> 0.2% Annual Chance Flood Hazard</div>
-        <div><i style="background:#e5d099;"></i> Reduced Risk Due to Levee</div>
-        <div><i style="background:#769ccd;"></i> Regulatory Floodway</div>
+        <strong>Flood Hazard Zones (FEMA)</strong>
+      
+        <div class="legend-ramp">
+          <span class="ramp-swatch" style="background:#feb24c;"></span>
+          <span class="ramp-swatch" style="background:#f03b20;"></span>
+          <span class="ramp-swatch" style="background:#769ccd;"></span>
+          <span class="ramp-swatch" style="background:#e5d099;"></span>
+        </div>
+        <div class="legend-ramp-labels">
+          <span>Hazard</span><span>Other</span>
+        </div>
+      
         <div style="display:block; margin-top:6px;">
-          Flood zones indicate mapped flood risk areas used for planning and flood insurance guidance.
+          FEMA NFHL zones showing flood hazard areas such as the 1% annual chance floodplain and regulatory floodway.
+          Colors match the map symbology used here.
+        </div>
+      
+        <div style="display:block; margin-top:6px;">
+          <em>1% Annual Chance:</em> #f03b20<br>
+          <em>0.2% Annual Chance:</em> #feb24c<br>
+          <em>Floodway:</em> #769ccd<br>
+          <em>Reduced risk due to levee:</em> #e5d099
         </div>
       </div>
 
@@ -1222,9 +1245,18 @@ function addLegendControls(map) {
       </div>
 
       <div class="legend-section">
-        <strong>Active Fires</strong>
+        <strong>Active Fires (WFIGS / NIFC)</strong>
+        <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
+          <span style="font-size:16px;">🔥</span><span>Small incident</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
+          <span style="font-size:26px;">🔥</span><span>Medium incident</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
+          <span style="font-size:40px;">🔥</span><span>Large incident</span>
+        </div>
         <div style="display:block; margin-top:6px;">
-          Current incident points from WFIGS/NIFC. Popup includes size, containment, and last update time.
+          Symbol size scales with reported fire size (acres) — larger 🔥 generally means a larger incident.
         </div>
       </div>
     `;
