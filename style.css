@@ -359,6 +359,16 @@ html, body {
   border: 1px solid #888;
 }
 
+.legend-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid rgba(0,0,0,0.25);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 /* Optional: custom scrollbar styling (Chromium/WebKit only) */
 .legend-panel::-webkit-scrollbar {
   width: 8px;
