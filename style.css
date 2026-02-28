@@ -159,7 +159,7 @@ html, body {
 
 /* Sidebar (left) */
 #sidebar {
-  width: 360px;
+  width: 400px;
   padding: 15px;
 
   display: flex;
@@ -229,8 +229,8 @@ html, body {
 
   /* This places it near the sidebar border.
      If you change sidebar width, adjust this.
-     (360px sidebar -> 180px is its halfway point) */
-  left: 180px;
+     (400px sidebar -> 200px is its halfway point) */
+  left: 200px;
 
   transform: translate(-50%, -50%);
   z-index: 2000;
