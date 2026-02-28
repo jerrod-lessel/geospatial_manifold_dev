@@ -1108,11 +1108,21 @@ function installClickReport(map, layers) {
   Flood zones represent areas with varying flood probabilities and are used for floodplain management, insurance, and development decisions.`;
     }
   
-    function fmtCalEnviro(title, valueStr, pctStr, noteStr) {
+    function fmtCalEnviro(indicatorKey, title, valueStr, pctStr, noteStr) {
+      // Short, friendly “what is this” blurbs (feel free to tweak wording)
+      const EXPLAIN = {
+        ozone: "Ground-level ozone is a lung irritant. This indicator summarizes warm-season ozone conditions (often tied to smog).",
+        pm: "PM2.5 is tiny airborne particulate pollution that can get deep into your lungs. Higher values generally mean worse air quality.",
+        drink: "Drinking water contaminants combines contaminant and violation info into a single score (higher is worse)."
+      };
+    
+      const explainText = EXPLAIN[indicatorKey] || "Environmental indicator from CalEnviroScreen.";
+    
       return `■ <strong>${title}:</strong><br>
-  <strong>Value:</strong> ${valueStr}<br>
-  <strong>Percentile:</strong> ${pctStr}<br>
-  <span style="opacity:0.9">${noteStr}</span>`;
+    ${explainText}<br>
+    <strong>Value:</strong> ${valueStr}<br>
+    <strong>Percentile:</strong> ${pctStr}<br>
+    <span style="opacity:0.9">${noteStr}</span>`;
     }
   
     function fmtLandslide(label) {
@@ -1242,9 +1252,13 @@ function installClickReport(map, layers) {
           const p = fc.features[0].properties;
           const ppm = p.ozone?.toFixed(3) ?? "unknown";
           const pct = p.ozoneP !== undefined ? Math.round(p.ozoneP) : "unknown";
-          results.ozone = `■ <strong>Ozone:</strong><br>
-Value: <strong>${ppm} ppm</strong><br>
-Percentile: <strong>${pct}</strong>`;
+          results.ozone = fmtCalEnviro(
+            "ozone",
+            "Ozone (Ground-Level)",
+            `${ppm} ppm`,
+            `${pct}`,
+            "<em>(Data from 2017–2019)</em>"
+          );
         }
       } catch (e2) {
         results.ozone = "■ <strong>Ozone:</strong> Error fetching data.";
@@ -1259,9 +1273,13 @@ Percentile: <strong>${pct}</strong>`;
           const p = fc.features[0].properties;
           const value = p.pm?.toFixed(2) ?? "unknown";
           const pct = p.pmP !== undefined ? Math.round(p.pmP) : "unknown";
-          results.pm = `■ <strong>PM2.5:</strong><br>
-Value: <strong>${value} µg/m³</strong><br>
-Percentile: <strong>${pct}</strong>`;
+          results.pm = fmtCalEnviro(
+            "pm",
+            "PM2.5 (Fine Particulate Matter)",
+            `${value} µg/m³`,
+            `${pct}`,
+            "<em>(Data from 2015–2017)</em>"
+          );
         }
       } catch (e2) {
         results.pm = "■ <strong>PM2.5:</strong> Error fetching data.";
@@ -1276,9 +1294,13 @@ Percentile: <strong>${pct}</strong>`;
           const p = fc.features[0].properties;
           const value = p.drink?.toFixed(2) ?? "unknown";
           const pct = p.drinkP !== undefined ? Math.round(p.drinkP) : "unknown";
-          results.drink = `■ <strong>Drinking Water:</strong><br>
-Score: <strong>${value}</strong><br>
-Percentile: <strong>${pct}</strong>`;
+          results.drink = fmtCalEnviro(
+            "drink",
+            "Drinking Water Contaminants",
+            `${value}`,
+            `${pct}`,
+            "<em>(Data from 2011–2019 compliance cycle)</em>"
+          );
         }
       } catch (e2) {
         results.drink = "■ <strong>Drinking Water:</strong> Error fetching data.";
