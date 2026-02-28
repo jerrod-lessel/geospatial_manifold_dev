@@ -1383,21 +1383,6 @@ function installClickReport(map, layers) {
     fireHazardLayer: fire.fireHazardLayer,
     activeFires: createActiveFiresLayer(),
 
-    /* =========================================================
-       Ensure faults draw above other visual overlays
-       ---------------------------------------------------------
-       When the faults layer is turned on, bring it to front.
-       This keeps thin fault lines visible above shaded layers
-       like landslide susceptibility.
-    ========================================================= */
-    faultsLayer.on("add", () => {
-      try {
-        faultsLayer.bringToFront();
-      } catch (err) {
-        console.warn("Could not bring faults layer to front:", err);
-      }
-    });
-
     // Env
     ozoneLayer: createCesLayer("ozoneP IS NOT NULL", "ozoneP"),
     pmLayer: createCesLayer("pmP IS NOT NULL", "pmP"),
@@ -1422,6 +1407,21 @@ function installClickReport(map, layers) {
     evChargers: ev.layer,
   };
 
+      /* =========================================================
+       Ensure faults draw above other visual overlays
+       ---------------------------------------------------------
+       When the faults layer is turned on, bring it to front.
+       This keeps thin fault lines visible above shaded layers
+       like landslide susceptibility.
+    ========================================================= */
+    faultsLayer.on("add", () => {
+      try {
+        faultsLayer.bringToFront();
+      } catch (err) {
+        console.warn("Could not bring faults layer to front:", err);
+      }
+    });
+  
   // 4) Install EV handlers (keeps EV logic isolated)
   ev.installHandlers();
 
@@ -1469,7 +1469,7 @@ function installClickReport(map, layers) {
     "Fire Hazard Zones": LAYERS.fireHazardLayer,
     "Flood Hazard Zones": LAYERS.floodLayer,
     "Landslide Susceptibility": LAYERS.landslideLayer,
-    "Falut Locations": LAYERS.faultsLayer,
+    "Fault Locations": LAYERS.faultsLayer,
     "Shaking Potential (MMI, 10%/50yr)": LAYERS.shakingLayer,
     "Active Fires": LAYERS.activeFires,
 
