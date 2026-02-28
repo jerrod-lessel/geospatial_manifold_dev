@@ -1407,20 +1407,27 @@ function installClickReport(map, layers) {
     evChargers: ev.layer,
   };
 
-      /* =========================================================
-       Ensure faults draw above other visual overlays
-       ---------------------------------------------------------
-       When the faults layer is turned on, bring it to front.
-       This keeps thin fault lines visible above shaded layers
-       like landslide susceptibility.
-    ========================================================= */
-    faultsLayer.on("add", () => {
-      try {
-        faultsLayer.bringToFront();
-      } catch (err) {
-        console.warn("Could not bring faults layer to front:", err);
-      }
-    });
+  /* =========================================================
+     Ensure faults draw above other visual overlays
+     ---------------------------------------------------------
+     IMPORTANT:
+     - Use LAYERS.faultsLayer (the actual layer instance)
+     - Do this AFTER the LAYERS object is created
+  ========================================================= */
+  LAYERS.faultsLayer.on("add", () => {
+    try {
+      // dynamicMapLayer supports bringToFront()
+      LAYERS.faultsLayer.bringToFront();
+    } catch (err) {
+      console.warn("Could not bring faults layer to front:", err);
+    }
+  });
+  // If any overlay is added later, keep faults on top if faults are enabled
+  map.on("overlayadd", () => {
+    if (map.hasLayer(LAYERS.faultsLayer)) {
+      try { LAYERS.faultsLayer.bringToFront(); } catch {}
+    }
+  });
   
   // 4) Install EV handlers (keeps EV logic isolated)
   ev.installHandlers();
