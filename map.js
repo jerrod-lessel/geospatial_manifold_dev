@@ -1,9 +1,10 @@
 /* ============================================================================
   map.js - Geospatial Manifold (Leaflet + Esri Leaflet)
+  VERSION: 2026-02-27.a
 
   WHAT THIS FILE DOES:
   - Initializes the map + basemap options
-  - Creates ALL layers via "factory functions" (industry-ish pattern)
+  - Creates ALL layers via "factory functions"
   - Registers layers in one place (LAYERS object)
   - Builds layer toggles from one place (LAYER_TOGGLES object)
   - Adds UI controls (layers control, home button, legend)
@@ -14,7 +15,7 @@
       - one-scrollbar popup content (CSS handles this)
 
   DEBUGGING:
-  - If map turns black: open DevTools Console and look for errors.
+  - If UI disappears: open DevTools Console and look for errors.
 ============================================================================ */
 
 /* ============================================================================
@@ -41,8 +42,13 @@ const SERVICES = {
     "https://gis.conservation.ca.gov/server/rest/services/CGS/MS58_LandslideSusceptibility_Classes/MapServer",
   SHAKING_IMAGESERVER:
     "https://gis.conservation.ca.gov/server/rest/services/CGS/MS48_MMI_PGV_10pc50/ImageServer",
-  FAULTS_MAPSERVER: 
-    "https://gis.conservation.ca.gov/server/rest/services/CGS/FaultActivityMapCA/MapServer",
+
+  // CGS Fault Activity Map (interactive line layers)
+  // IMPORTANT: /15 is a GROUP layer (container). Use its Feature Layer children instead:
+  //   17 = Quaternary Faults (Regional)  [good when zoomed out]
+  //   21 = Quaternary Faults (Local)     [good when zoomed in]
+  FAULTS_REGIONAL_QUAT: "https://gis.conservation.ca.gov/server/rest/services/CGS/FaultActivityMapCA/MapServer/17",
+  FAULTS_LOCAL_QUAT: "https://gis.conservation.ca.gov/server/rest/services/CGS/FaultActivityMapCA/MapServer/21",
 
   // Fire Hazard Severity Zones
   FIRE_SRA:
@@ -338,9 +344,7 @@ function identifyMMIAt(latlng) {
 }
 
 /* ============================================================================
-  6) LAYER FACTORIES (the big refactor)
-  - Each function returns a fully-configured Leaflet/Esri layer.
-  - This makes the file easier to extend without accidentally breaking stuff.
+  6) LAYER FACTORIES
 ============================================================================ */
 
 /** Fire hazard layer style */
@@ -355,7 +359,6 @@ function fireStyle(feature) {
 
 /**
  * Create fire layers (SRA + LRA) + a combined group for toggles.
- * @returns {{fireHazardSRA: any, fireHazardLRA: any, fireHazardLayer: any}}
  */
 function createFireLayers() {
   const fireHazardSRA = L.esri.featureLayer({
@@ -371,7 +374,6 @@ function createFireLayers() {
   });
 
   const fireHazardLayer = L.layerGroup([fireHazardSRA, fireHazardLRA]);
-
   return { fireHazardSRA, fireHazardLRA, fireHazardLayer };
 }
 
@@ -432,36 +434,102 @@ function createLandslideVisualLayer() {
   });
 }
 
-/** Faults */
-function createFaultsLayer() {
-  // IMPORTANT: point at the FEATURE sublayer, not the MapServer root
-  const url = `${SERVICES.FAULTS_MAPSERVER}/21`;
+/**
+ * Faults (interactive lines, no server labels/symbology).
+ *
+ * Why:
+ * - dynamicMapLayer() draws server cartography (colors, labels).
+ * - featureLayer() lets us draw plain lines AND click/query attributes.
+ *
+ * Strategy:
+ * - REGIONAL faults when zoomed out
+ * - LOCAL faults when zoomed in
+ */
+function createFaultsInteractiveLayer(map) {
+  // Pick first existing field from a list of candidates
+  function pickField(props, candidates) {
+    for (const k of candidates) {
+      if (props && props[k] != null && props[k] !== "") return props[k];
+    }
+    return null;
+  }
 
-  return L.esri.featureLayer({
-    url,
+  // Bind a robust popup (field names can vary)
+  function bindFaultPopup(feature, layer) {
+    const p = feature.properties || {};
 
-    // Keep it light: only request fields we need for popups
-    fields: ["FLT_NAME", "FLT_AGE"],
+    const name =
+      pickField(p, ["FAULT_NAME", "FAULTNAME", "NAME", "FaultName", "fault_name"]) || "Unknown fault";
 
-    // Simple client-side styling (no CGS cartography)
-    style: () => ({
-      color: "#111",     // near-black
-      weight: 2,         // line thickness
+    const age =
+      pickField(p, ["AGE", "AGE_CLASS", "AGE_DESC", "Age", "age", "AGEOFMOVE", "ACTIVITY"]) || "Unknown age";
+
+    const extra =
+      pickField(p, ["TYPE", "FAULT_TYPE", "SENSE", "SLIPTYPE", "SlipType"]) || null;
+
+    layer.bindPopup(`
+      <strong>Fault:</strong> ${name}<br>
+      <strong>Age / Activity:</strong> ${age}
+      ${extra ? `<br><strong>Type:</strong> ${extra}` : ""}
+    `);
+  }
+
+  // Simple line styling YOU control
+  function faultLineStyle() {
+    return {
+      color: "#ffef5a",
+      weight: 2,
       opacity: 0.9,
-    }),
+    };
+  }
 
-    // Make lines clickable + show name/age
-    onEachFeature: (feature, layer) => {
-      const p = feature.properties || {};
-      const name = p.FLT_NAME || "Unknown fault";
-      const age = p.FLT_AGE || "Unknown";
-
-      layer.bindPopup(`
-        <strong>Fault:</strong> ${name}<br>
-        <strong>Age:</strong> ${age}
-      `);
-    },
+  // Regional (zoomed out)
+  const regional = L.esri.featureLayer({
+    url: SERVICES.FAULTS_REGIONAL_QUAT,
+    style: faultLineStyle,
+    onEachFeature: bindFaultPopup,
   });
+
+  // Local (zoomed in)
+  const local = L.esri.featureLayer({
+    url: SERVICES.FAULTS_LOCAL_QUAT,
+    style: faultLineStyle,
+    onEachFeature: bindFaultPopup,
+  });
+
+  // Group that goes into the Layers control
+  const group = L.layerGroup();
+
+  // Tune this threshold if you want the swap earlier/later
+  const SWITCH_ZOOM = 11;
+
+  function syncToZoom() {
+    const z = map.getZoom();
+    const wantLocal = z >= SWITCH_ZOOM;
+
+    group.clearLayers();
+    group.addLayer(wantLocal ? local : regional);
+
+    // Keep faults above filled overlays (best-effort)
+    try {
+      (wantLocal ? local : regional).bringToFront();
+    } catch (e) {
+      // Not fatal if bringToFront isn't supported in some edge cases
+    }
+  }
+
+  // Only switch while enabled
+  group.on("add", () => {
+    syncToZoom();
+    map.on("zoomend", syncToZoom);
+  });
+
+  group.on("remove", () => {
+    map.off("zoomend", syncToZoom);
+    group.clearLayers();
+  });
+
+  return group;
 }
 
 /** Shaking visual image layer */
@@ -515,15 +583,20 @@ function createActiveFiresLayer() {
     },
     onEachFeature: function (feature, layer) {
       const p = feature.properties;
-      const acres = p.IncidentSize && p.IncidentSize > 0 ? Math.round(p.IncidentSize).toLocaleString() : "N/A";
+      const acres =
+        p.IncidentSize && p.IncidentSize > 0 ? Math.round(p.IncidentSize).toLocaleString() : "N/A";
 
       layer.bindPopup(`
         <strong>${p.IncidentName || "Unknown Fire"}</strong><hr>
         <strong>Acres Burned:</strong> ${acres}<br>
         <strong>Percent Contained:</strong> ${p.PercentContained ?? 0}%<br>
         <strong>Cause:</strong> ${p.FireCause || "Undetermined"}<br>
-        <strong>Discovered:</strong> ${p.FireDiscoveryDateTime ? new Date(p.FireDiscoveryDateTime).toLocaleDateString() : "N/A"}<br>
-        <strong>Last Updated:</strong> ${p.ModifiedOnDateTime_dt ? new Date(p.ModifiedOnDateTime_dt).toLocaleString() : "N/A"}
+        <strong>Discovered:</strong> ${
+          p.FireDiscoveryDateTime ? new Date(p.FireDiscoveryDateTime).toLocaleDateString() : "N/A"
+        }<br>
+        <strong>Last Updated:</strong> ${
+          p.ModifiedOnDateTime_dt ? new Date(p.ModifiedOnDateTime_dt).toLocaleString() : "N/A"
+        }
       `);
     },
   });
@@ -760,7 +833,6 @@ function createUniversitiesLayer() {
 /**
  * EV Chargers layer factory:
  * Returns { layer, installHandlers(map) }
- * so you can keep EV logic encapsulated.
  */
 function createEvChargersLayer(map) {
   const layer = L.layerGroup();
@@ -899,7 +971,9 @@ function getClosestFeatureByEdgeDistance(layer, clickLatLng, label, fieldName, _
 
       if (bestFeature) {
         callback(
-          `■ <strong>Nearest ${label}:</strong> ${bestFeature.properties[fieldName]}<br>📏 Distance: ${minDist.toFixed(2)} mi`
+          `■ <strong>Nearest ${label}:</strong> ${bestFeature.properties[fieldName]}<br>📏 Distance: ${minDist.toFixed(
+            2
+          )} mi`
         );
         return;
       }
@@ -971,111 +1045,120 @@ function addLegendControls(map) {
     div.addEventListener("touchmove", (e) => e.stopPropagation(), { passive: false });
     div.addEventListener("wheel", (e) => e.stopPropagation(), { passive: false });
 
-      div.innerHTML = `
-        <h2>Legends</h2>
-    
-        <div class="legend-section">
-          <strong>Fire Hazard Severity Zones</strong>
-          <div><i style="background:#d7191c;"></i> Very High</div>
-          <div><i style="background:#fdae61;"></i> High</div>
-          <div><i style="background:#ffffbf;"></i> Moderate</div>
-          <div style="display:block; margin-top:6px;">
-            These zones describe expected fire behavior based on fuels, terrain, and typical fire weather.
-          </div>
-        </div>
-    
-        <div class="legend-section">
-          <strong>Flood Zones (FEMA NFHL)</strong>
-          <div><i style="background:#f03b20;"></i> 1% Annual Chance Flood Hazard</div>
-          <div><i style="background:#feb24c;"></i> 0.2% Annual Chance Flood Hazard</div>
-          <div><i style="background:#e5d099;"></i> Reduced Risk Due to Levee</div>
-          <div><i style="background:#769ccd;"></i> Regulatory Floodway</div>
-          <div style="display:block; margin-top:6px;">
-            Flood zones indicate mapped flood risk areas used for planning and flood insurance guidance.
-          </div>
-        </div>
-    
-        <div class="legend-section">
-          <strong>Landslide Susceptibility (CGS)</strong>
-        
-          <div class="legend-ramp">
-            <span class="ramp-swatch" style="background:#ffffc5;"></span>
-            <span class="ramp-swatch" style="background:#f8d58b;"></span>
-            <span class="ramp-swatch" style="background:#f3ae3d;"></span>
-            <span class="ramp-swatch" style="background:#db9b36;"></span>
-            <span class="ramp-swatch" style="background:#ec622b;"></span>
-            <span class="ramp-swatch" style="background:#d32d1f;"></span>
-            <span class="ramp-swatch" style="background:#9a1e13;"></span>
-          </div>
-          <div class="legend-ramp-labels">
-            <span>Lower</span><span>Higher</span>
-          </div>
+    div.innerHTML = `
+      <h2>Legends</h2>
 
-          <div style="display:block; margin-top:6px;">
-            Relative susceptibility classes. Higher classes generally indicate terrain more prone to slope failure
-            under triggers like intense rainfall, earthquakes, and drainage changes.
-          </div>
+      <div class="legend-section">
+        <strong>Fire Hazard Severity Zones</strong>
+        <div><i style="background:#d7191c;"></i> Very High</div>
+        <div><i style="background:#fdae61;"></i> High</div>
+        <div><i style="background:#ffffbf;"></i> Moderate</div>
+        <div style="display:block; margin-top:6px;">
+          These zones describe expected fire behavior based on fuels, terrain, and typical fire weather.
         </div>
-    
-        <div class="legend-section">
-          <strong>Shaking Potential (MMI, 10% in 50 years)</strong>
-        
-          <div class="legend-ramp">
-            <span class="ramp-swatch" style="background:rgb(255,255,191);"></span>
-            <span class="ramp-swatch" style="background:rgb(245,245,0);"></span>
-            <span class="ramp-swatch" style="background:rgb(247,206,0);"></span>
-            <span class="ramp-swatch" style="background:rgb(250,125,0);"></span>
-            <span class="ramp-swatch" style="background:rgb(253,42,0);"></span>
-            <span class="ramp-swatch" style="background:rgb(199,8,8);"></span>
-            <span class="ramp-swatch" style="background:rgb(140,8,8);"></span>
-          </div>
-          <div class="legend-ramp-labels">
-            <span>MMI 4</span><span>MMI 10+</span>
-          </div>
-        
-          <div style="display:block; margin-top:6px;">
-            Modified Mercalli Intensity estimated from ground motion (PGV). Higher values generally mean stronger shaking
-            and greater potential for damage.
-          </div>
+      </div>
+
+      <div class="legend-section">
+        <strong>Flood Zones (FEMA NFHL)</strong>
+        <div><i style="background:#f03b20;"></i> 1% Annual Chance Flood Hazard</div>
+        <div><i style="background:#feb24c;"></i> 0.2% Annual Chance Flood Hazard</div>
+        <div><i style="background:#e5d099;"></i> Reduced Risk Due to Levee</div>
+        <div><i style="background:#769ccd;"></i> Regulatory Floodway</div>
+        <div style="display:block; margin-top:6px;">
+          Flood zones indicate mapped flood risk areas used for planning and flood insurance guidance.
         </div>
-    
-        <div class="legend-section">
-          <strong>CalEnviroScreen Indicators (Percentile)</strong>
-        
-          <div class="legend-ramp">
-            <span class="ramp-swatch" style="background:#ffffcc;"></span>
-            <span class="ramp-swatch" style="background:#f7fbff;"></span>
-            <span class="ramp-swatch" style="background:#deebf7;"></span>
-            <span class="ramp-swatch" style="background:#c6dbef;"></span>
-            <span class="ramp-swatch" style="background:#9ecae1;"></span>
-            <span class="ramp-swatch" style="background:#6baed6;"></span>
-            <span class="ramp-swatch" style="background:#4292c6;"></span>
-            <span class="ramp-swatch" style="background:#2171b5;"></span>
-            <span class="ramp-swatch" style="background:#08519c;"></span>
-            <span class="ramp-swatch" style="background:#08306b;"></span>
-          </div>
-          <div class="legend-ramp-labels">
-            <span>0–10</span><span>90–100</span>
-          </div>
-        
-          <div style="display:block; margin-top:6px;">
-            Percentiles compare census tracts statewide. Higher percentiles generally indicate higher burden/worse conditions.
-            The map report shows both the raw value (when available) and the percentile.
-          </div>
-          <div style="display:block; margin-top:6px;">
-            <em>Ozone:</em> summer-season ozone summary.<br>
-            <em>PM2.5:</em> annual average fine particulates.<br>
-            <em>Drinking Water:</em> combined contaminant + violation score.
-          </div>
+      </div>
+
+      <div class="legend-section">
+        <strong>Landslide Susceptibility (CGS)</strong>
+
+        <div class="legend-ramp">
+          <span class="ramp-swatch" style="background:#ffffc5;"></span>
+          <span class="ramp-swatch" style="background:#f8d58b;"></span>
+          <span class="ramp-swatch" style="background:#f3ae3d;"></span>
+          <span class="ramp-swatch" style="background:#db9b36;"></span>
+          <span class="ramp-swatch" style="background:#ec622b;"></span>
+          <span class="ramp-swatch" style="background:#d32d1f;"></span>
+          <span class="ramp-swatch" style="background:#9a1e13;"></span>
         </div>
-    
-        <div class="legend-section">
-          <strong>Active Fires</strong>
-          <div style="display:block; margin-top:6px;">
-            Current incident points from WFIGS/NIFC. Popup includes size, containment, and last update time.
-          </div>
+        <div class="legend-ramp-labels">
+          <span>Lower</span><span>Higher</span>
         </div>
-      `;
+
+        <div style="display:block; margin-top:6px;">
+          Relative susceptibility classes. Higher classes generally indicate terrain more prone to slope failure
+          under triggers like intense rainfall, earthquakes, and drainage changes.
+        </div>
+      </div>
+
+      <div class="legend-section">
+        <strong>Shaking Potential (MMI, 10% in 50 years)</strong>
+
+        <div class="legend-ramp">
+          <span class="ramp-swatch" style="background:rgb(255,255,191);"></span>
+          <span class="ramp-swatch" style="background:rgb(245,245,0);"></span>
+          <span class="ramp-swatch" style="background:rgb(247,206,0);"></span>
+          <span class="ramp-swatch" style="background:rgb(250,125,0);"></span>
+          <span class="ramp-swatch" style="background:rgb(253,42,0);"></span>
+          <span class="ramp-swatch" style="background:rgb(199,8,8);"></span>
+          <span class="ramp-swatch" style="background:rgb(140,8,8);"></span>
+        </div>
+        <div class="legend-ramp-labels">
+          <span>MMI 4</span><span>MMI 10+</span>
+        </div>
+
+        <div style="display:block; margin-top:6px;">
+          Modified Mercalli Intensity estimated from ground motion (PGV). Higher values generally mean stronger shaking
+          and greater potential for damage.
+        </div>
+      </div>
+
+      <div class="legend-section">
+        <strong>CalEnviroScreen Indicators (Percentile)</strong>
+
+        <div class="legend-ramp">
+          <span class="ramp-swatch" style="background:#ffffcc;"></span>
+          <span class="ramp-swatch" style="background:#f7fbff;"></span>
+          <span class="ramp-swatch" style="background:#deebf7;"></span>
+          <span class="ramp-swatch" style="background:#c6dbef;"></span>
+          <span class="ramp-swatch" style="background:#9ecae1;"></span>
+          <span class="ramp-swatch" style="background:#6baed6;"></span>
+          <span class="ramp-swatch" style="background:#4292c6;"></span>
+          <span class="ramp-swatch" style="background:#2171b5;"></span>
+          <span class="ramp-swatch" style="background:#08519c;"></span>
+          <span class="ramp-swatch" style="background:#08306b;"></span>
+        </div>
+        <div class="legend-ramp-labels">
+          <span>0–10</span><span>90–100</span>
+        </div>
+
+        <div style="display:block; margin-top:6px;">
+          Percentiles compare census tracts statewide. Higher percentiles generally indicate higher burden/worse conditions.
+          The map report shows both the raw value (when available) and the percentile.
+        </div>
+        <div style="display:block; margin-top:6px;">
+          <em>Ozone:</em> summer-season ozone summary.<br>
+          <em>PM2.5:</em> annual average fine particulates.<br>
+          <em>Drinking Water:</em> combined contaminant + violation score.
+        </div>
+      </div>
+
+      <div class="legend-section">
+        <strong>Faults</strong>
+        <div style="display:block; margin-top:6px;">
+          Click fault lines to see the fault name and age/activity. This layer swaps between “regional” and “local”
+          fault lines as you zoom in/out so you get appropriate detail at each scale.
+        </div>
+      </div>
+
+      <div class="legend-section">
+        <strong>Active Fires</strong>
+        <div style="display:block; margin-top:6px;">
+          Current incident points from WFIGS/NIFC. Popup includes size, containment, and last update time.
+        </div>
+      </div>
+    `;
+
     return div;
   };
   legendPanel.addTo(map);
@@ -1091,7 +1174,6 @@ function addLegendControls(map) {
 
 /* ============================================================================
   10) CLICK REPORT
-  - Kept as “fail-soft”: every task must checkDone() no matter what.
 ============================================================================ */
 
 function installClickReport(map, layers) {
@@ -1124,53 +1206,48 @@ function installClickReport(map, layers) {
     };
 
     // ===============================
-    // Report formatting helpers (keeps output consistent + easy to expand later)
+    // Report formatting helpers
     // ===============================
-    function fmtNoData(title) {
-      return `❌ <strong>${title}:</strong> No data at this location.`;
-    }
-  
     function fmtFireInside(zone, whichArea /* "SRA" or "LRA" */) {
       return `■ <strong>Fire Hazard Zone (${whichArea}):</strong><br>
-  This location is within a <strong>${zone}</strong> Fire Hazard Severity Zone.<br>
-  These zones reflect expected fire behavior based on fuels, terrain, and typical fire weather, and are used to guide planning and mitigation.`;
+This location is within a <strong>${zone}</strong> Fire Hazard Severity Zone.<br>
+These zones reflect expected fire behavior based on fuels, terrain, and typical fire weather, and are used to guide planning and mitigation.`;
     }
-  
+
     function fmtFloodInside(zone) {
       return `■ <strong>Flood Hazard Zone:</strong><br>
-  This location is within <strong>${zone}</strong> (FEMA NFHL).<br>
-  Flood zones represent areas with varying flood probabilities and are used for floodplain management, insurance, and development decisions.`;
+This location is within <strong>${zone}</strong> (FEMA NFHL).<br>
+Flood zones represent areas with varying flood probabilities and are used for floodplain management, insurance, and development decisions.`;
     }
-  
+
     function fmtCalEnviro(indicatorKey, title, valueStr, pctStr, noteStr) {
-      // Short, friendly “what is this” blurbs (feel free to tweak wording)
       const EXPLAIN = {
         ozone: "Ground-level ozone is a lung irritant. This indicator summarizes warm-season ozone conditions (often tied to smog).",
         pm: "PM2.5 is tiny airborne particulate pollution that can get deep into your lungs. Higher values generally mean worse air quality.",
-        drink: "Drinking water contaminants combines contaminant and violation info into a single score (higher is worse)."
+        drink: "Drinking water contaminants combines contaminant and violation info into a single score (higher is worse).",
       };
-    
+
       const explainText = EXPLAIN[indicatorKey] || "Environmental indicator from CalEnviroScreen.";
-    
+
       return `■ <strong>${title}:</strong><br>
-    ${explainText}<br>
-    <strong>Value:</strong> ${valueStr}<br>
-    <strong>Percentile:</strong> ${pctStr}<br>
-    <span style="opacity:0.9">${noteStr}</span>`;
+${explainText}<br>
+<strong>Value:</strong> ${valueStr}<br>
+<strong>Percentile:</strong> ${pctStr}<br>
+<span style="opacity:0.9">${noteStr}</span>`;
     }
-  
+
     function fmtLandslide(label) {
       return `■ <strong>Landslide Susceptibility:</strong><br>
-  Class <strong>${label}</strong> (California Geological Survey).<br>
-  Higher classes generally indicate terrain more prone to slope failure under triggers like intense rainfall, earthquakes, and drainage changes.`;
+Class <strong>${label}</strong> (California Geological Survey).<br>
+Higher classes generally indicate terrain more prone to slope failure under triggers like intense rainfall, earthquakes, and drainage changes.`;
     }
-  
-    function fmtShaking(mmi, fmt) {
+
+    function fmtShaking(_mmi, fmt) {
       return `■ <strong>Shaking Potential (MMI, 10%/50yr):</strong><br>
-  Estimated intensity: <strong>${fmt.valueStr}</strong> (${fmt.label}).<br>
-  MMI is a human-impact scale: higher values generally mean stronger shaking and greater potential for damage.`;
+Estimated intensity: <strong>${fmt.valueStr}</strong> (${fmt.label}).<br>
+MMI is a human-impact scale: higher values generally mean stronger shaking and greater potential for damage.`;
     }
-    
+
     let completed = 0;
     const totalTasks = Object.keys(results).length;
 
@@ -1219,7 +1296,9 @@ function installClickReport(map, layers) {
           if (!best || dist < best.dist) {
             best = {
               dist,
-              text: `■ <strong>Nearest ${label}:</strong> ${f.properties[fieldName]}<br>📏 Distance: ${dist.toFixed(2)} mi`,
+              text: `■ <strong>Nearest ${label}:</strong> ${f.properties[fieldName]}<br>📏 Distance: ${dist.toFixed(
+                2
+              )} mi`,
             };
           }
         }
@@ -1267,10 +1346,17 @@ function installClickReport(map, layers) {
           const zone = fc.features[0].properties.ESRI_SYMBOLOGY;
           results.flood = fmtFloodInside(zone);
         } else {
-          getClosestFeatureByEdgeDistance(layers.floodLayer, e.latlng, "Flood Hazard Zone", "ESRI_SYMBOLOGY", [], (txt) => {
-            results.flood = txt + `<br><em>Note: FEMA flood zones guide insurance and floodplain decisions.</em>`;
-            checkDone();
-          });
+          getClosestFeatureByEdgeDistance(
+            layers.floodLayer,
+            e.latlng,
+            "Flood Hazard Zone",
+            "ESRI_SYMBOLOGY",
+            [],
+            (txt) => {
+              results.flood = txt + `<br><em>Note: FEMA flood zones guide insurance and floodplain decisions.</em>`;
+              checkDone();
+            }
+          );
           return; // callback will call checkDone
         }
       } catch (e2) {
@@ -1391,7 +1477,6 @@ function installClickReport(map, layers) {
   // 3) Create layers via factories (registry pattern)
   const fire = createFireLayers();
   const ev = createEvChargersLayer(map);
-
   const universities = createUniversitiesLayer();
 
   // LAYERS: single place to find every layer later
@@ -1399,7 +1484,7 @@ function installClickReport(map, layers) {
     // Hazards
     landslideLayer: createLandslideVisualLayer(),
     shakingLayer: createShakingVisualLayer(),
-    faultsLayer: createFaultsLayer(),
+    faultsLayer: createFaultsInteractiveLayer(map), // ✅ clickable + simple lines + zoom switching
     floodLayer: createFloodLayer(),
     fireHazardSRA: fire.fireHazardSRA,
     fireHazardLRA: fire.fireHazardLRA,
@@ -1430,28 +1515,6 @@ function installClickReport(map, layers) {
     evChargers: ev.layer,
   };
 
-  /* =========================================================
-     Ensure faults draw above other visual overlays
-     ---------------------------------------------------------
-     IMPORTANT:
-     - Use LAYERS.faultsLayer (the actual layer instance)
-     - Do this AFTER the LAYERS object is created
-  ========================================================= */
-  LAYERS.faultsLayer.on("add", () => {
-    try {
-      // dynamicMapLayer supports bringToFront()
-      LAYERS.faultsLayer.bringToFront();
-    } catch (err) {
-      console.warn("Could not bring faults layer to front:", err);
-    }
-  });
-  // If any overlay is added later, keep faults on top if faults are enabled
-  map.on("overlayadd", () => {
-    if (map.hasLayer(LAYERS.faultsLayer)) {
-      try { LAYERS.faultsLayer.bringToFront(); } catch {}
-    }
-  });
-  
   // 4) Install EV handlers (keeps EV logic isolated)
   ev.installHandlers();
 
@@ -1499,7 +1562,7 @@ function installClickReport(map, layers) {
     "Fire Hazard Zones": LAYERS.fireHazardLayer,
     "Flood Hazard Zones": LAYERS.floodLayer,
     "Landslide Susceptibility": LAYERS.landslideLayer,
-    "Faults (Quaternary)": LAYERS.faultsLayer,
+    "Faults (Clickable)": LAYERS.faultsLayer,
     "Shaking Potential (MMI, 10%/50yr)": LAYERS.shakingLayer,
     "Active Fires": LAYERS.activeFires,
 
