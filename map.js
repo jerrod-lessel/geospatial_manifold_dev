@@ -432,12 +432,35 @@ function createLandslideVisualLayer() {
   });
 }
 
-/** Fault activity visual dynamic layer (CGS Fault Activity Map) */
-function createFaultsVisualLayer() {
-  return L.esri.dynamicMapLayer({
-    url: SERVICES.FAULTS_MAPSERVER,
-    // Slightly higher opacity works well because faults are typically thin linework.
-    opacity: 0.85,
+/** Faults */
+function createFaultsLayer() {
+  // IMPORTANT: point at the FEATURE sublayer, not the MapServer root
+  const url = `${SERVICES.FAULTS_MAPSERVER}/21`;
+
+  return L.esri.featureLayer({
+    url,
+
+    // Keep it light: only request fields we need for popups
+    fields: ["FLT_NAME", "FLT_AGE"],
+
+    // Simple client-side styling (no CGS cartography)
+    style: () => ({
+      color: "#111",     // near-black
+      weight: 2,         // line thickness
+      opacity: 0.9,
+    }),
+
+    // Make lines clickable + show name/age
+    onEachFeature: (feature, layer) => {
+      const p = feature.properties || {};
+      const name = p.FLT_NAME || "Unknown fault";
+      const age = p.FLT_AGE || "Unknown";
+
+      layer.bindPopup(`
+        <strong>Fault:</strong> ${name}<br>
+        <strong>Age:</strong> ${age}
+      `);
+    },
   });
 }
 
@@ -1376,7 +1399,7 @@ function installClickReport(map, layers) {
     // Hazards
     landslideLayer: createLandslideVisualLayer(),
     shakingLayer: createShakingVisualLayer(),
-    faultsLayer: createFaultsVisualLayer(),
+    faultsLayer: createFaultsLayer(),
     floodLayer: createFloodLayer(),
     fireHazardSRA: fire.fireHazardSRA,
     fireHazardLRA: fire.fireHazardLRA,
@@ -1476,7 +1499,7 @@ function installClickReport(map, layers) {
     "Fire Hazard Zones": LAYERS.fireHazardLayer,
     "Flood Hazard Zones": LAYERS.floodLayer,
     "Landslide Susceptibility": LAYERS.landslideLayer,
-    "Fault Locations": LAYERS.faultsLayer,
+    "Faults (Quaternary)": LAYERS.faultsLayer,
     "Shaking Potential (MMI, 10%/50yr)": LAYERS.shakingLayer,
     "Active Fires": LAYERS.activeFires,
 
