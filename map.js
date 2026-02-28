@@ -436,23 +436,171 @@ function createLandslideVisualLayer() {
 
 /**
  * Faults (interactive lines, no server labels/symbology).
- *
- * Why:
- * - dynamicMapLayer() draws server cartography (colors, labels).
- * - featureLayer() lets us draw plain lines AND click/query attributes.
- *
- * Strategy:
  * - REGIONAL faults when zoomed out
  * - LOCAL faults when zoomed in
+ *
+ * Fixes:
+ *  1) nicer gray / gray-blue styling
+ *  2) robust attribute detection (no more "Unknown")
  */
 function createFaultsInteractiveLayer(map) {
-  // Pick first existing field from a list of candidates
-  function pickField(props, candidates) {
-    for (const k of candidates) {
-      if (props && props[k] != null && props[k] !== "") return props[k];
-    }
-    return null;
+  // ---- Styling (tweak these to taste)
+  function faultLineStyle() {
+    return {
+      color: "#8ea3b7",   // light gray-blue
+      weight: 2,
+      opacity: 0.9,
+    };
   }
+
+  // ---- Helpers: find the "best" property key by scoring candidates
+  const NAME_HINTS = [
+    "fault", "name", "faultname", "fault_name", "fault_name_",
+    "faultnam", "faultnm", "faultnm_", "fault_nm", "f_name"
+  ];
+  const AGE_HINTS = [
+    "age", "activity", "recency", "holocene", "pleistocene",
+    "quaternary", "time", "ageclass", "age_class", "age_desc",
+    "ageofmove", "age_of_move", "most_recent", "last_movement",
+    "sliprate", "slip_rate"
+  ];
+
+  function normalizeKey(k) {
+    return String(k).toLowerCase().replace(/[^a-z0-9]/g, "");
+  }
+
+  function scoreKey(key, hints) {
+    const nk = normalizeKey(key);
+    let score = 0;
+    for (const h of hints) {
+      const nh = normalizeKey(h);
+      if (!nh) continue;
+      if (nk === nh) score += 50;          // exact-ish match
+      else if (nk.includes(nh)) score += 20; // partial match
+    }
+    // Prefer shorter keys when scores tie (often the “main” field)
+    score += Math.max(0, 10 - Math.min(10, nk.length / 6));
+    return score;
+  }
+
+  function pickBestKey(props, hints) {
+    if (!props) return null;
+    const keys = Object.keys(props);
+    let best = null;
+
+    for (const k of keys) {
+      const v = props[k];
+      if (v == null || v === "") continue;
+      const s = scoreKey(k, hints);
+      if (!best || s > best.score) best = { key: k, score: s };
+    }
+
+    // If nothing matched hints well, fall back to a reasonable string field
+    if (!best || best.score < 15) {
+      for (const k of keys) {
+        const v = props[k];
+        if (typeof v === "string" && v.trim().length >= 3) {
+          return k;
+        }
+      }
+      return null;
+    }
+
+    return best.key;
+  }
+
+  // ---- Bind popup with auto-detected fields per-feature (works even if layers differ)
+  function bindFaultPopup(feature, layer) {
+    const p = feature.properties || {};
+
+    const nameKey = pickBestKey(p, NAME_HINTS);
+    const ageKey = pickBestKey(p, AGE_HINTS);
+
+    const nameVal = nameKey ? p[nameKey] : null;
+    const ageVal = ageKey ? p[ageKey] : null;
+
+    const nameStr = nameVal != null && String(nameVal).trim() ? String(nameVal) : "Unknown";
+    const ageStr = ageVal != null && String(ageVal).trim() ? String(ageVal) : "Unknown";
+
+    // Optional: show which fields were used (nice for debugging; set false to hide)
+    const SHOW_KEYS = false;
+
+    layer.bindPopup(`
+      <strong>Fault:</strong> ${nameStr}<br>
+      <strong>Age / Activity:</strong> ${ageStr}
+      ${SHOW_KEYS ? `<hr style="margin:6px 0;">
+        <small style="opacity:0.8">
+          name field: ${nameKey || "n/a"}<br>
+          age field: ${ageKey || "n/a"}
+        </small>` : ""}
+    `);
+  }
+
+  // ---- Build the two source layers
+  const regional = L.esri.featureLayer({
+    url: SERVICES.FAULTS_REGIONAL_QUAT,
+    style: faultLineStyle,
+    onEachFeature: bindFaultPopup,
+  });
+
+  const local = L.esri.featureLayer({
+    url: SERVICES.FAULTS_LOCAL_QUAT,
+    style: faultLineStyle,
+    onEachFeature: bindFaultPopup,
+  });
+
+  // ---- Group that goes into the Layers control
+  const group = L.layerGroup();
+
+  // Tune this threshold if you want the swap earlier/later
+  const SWITCH_ZOOM = 11;
+
+  function syncToZoom() {
+    const z = map.getZoom();
+    const wantLocal = z >= SWITCH_ZOOM;
+
+    group.clearLayers();
+    group.addLayer(wantLocal ? local : regional);
+
+    // Keep faults above filled overlays (best-effort)
+    try {
+      (wantLocal ? local : regional).bringToFront();
+    } catch (e) {}
+  }
+
+  // Only switch while enabled
+  group.on("add", () => {
+    syncToZoom();
+    map.on("zoomend", syncToZoom);
+  });
+
+  group.on("remove", () => {
+    map.off("zoomend", syncToZoom);
+    group.clearLayers();
+  });
+
+  // ---- Quick sanity check log (helps confirm the layer is actually returning attributes)
+  // Toggle this true if you still see Unknowns, then click one line and read console output.
+  const DEBUG_FIRST_FEATURE = false;
+  function logOneFeatureOnce(layerObj, label) {
+    if (!DEBUG_FIRST_FEATURE) return;
+    let did = false;
+    layerObj.once("load", function () {
+      if (did) return;
+      did = true;
+      const any = layerObj.getLayers?.()[0];
+      if (any && any.feature && any.feature.properties) {
+        console.log(`[Faults ${label}] sample properties keys:`, Object.keys(any.feature.properties));
+      } else {
+        console.log(`[Faults ${label}] no sample feature found yet.`);
+      }
+    });
+  }
+  logOneFeatureOnce(regional, "regional");
+  logOneFeatureOnce(local, "local");
+
+  return group;
+}
 
   // Bind a robust popup (field names can vary)
   function bindFaultPopup(feature, layer) {
