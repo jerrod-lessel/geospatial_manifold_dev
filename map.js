@@ -1143,78 +1143,32 @@ function getClosestFeatureByEdgeDistance(layer, clickLatLng, label, fieldName, _
 
 function getDistanceToLineMiles(clickLatLng, feature) {
   const pt = turf.point([clickLatLng.lng, clickLatLng.lat]);
+  const geom = feature?.geometry;
 
-  // feature is GeoJSON; turf.pointToLineDistance works on LineString or MultiLineString
-  const d = turf.pointToLineDistance(pt, feature, { units: "miles" });
-  return Number.isFinite(d) ? d : NaN;
-}
+  if (!geom) return NaN;
 
-function findBestFaultName(props) {
-  if (!props) return "Unknown fault";
+  // Handle LineString
+  if (geom.type === "LineString") {
+    const line = turf.lineString(geom.coordinates);
+    const nearest = turf.nearestPointOnLine(line, pt, { units: "miles" });
+    return Number(nearest?.properties?.dist);
+  }
 
-  // Same “smart key picking” vibe you used in the popup
-  const NAME_HINTS = ["fault", "name", "faultname", "fault_name", "faultnm", "f_name"];
+  // Handle MultiLineString
+  if (geom.type === "MultiLineString") {
+    let best = Infinity;
 
-  const normalizeKey = (k) => String(k).toLowerCase().replace(/[^a-z0-9]/g, "");
-  const scoreKey = (key) => {
-    const nk = normalizeKey(key);
-    let s = 0;
-    for (const h of NAME_HINTS) {
-      const nh = normalizeKey(h);
-      if (nk === nh) s += 50;
-      else if (nk.includes(nh)) s += 20;
+    for (const coords of geom.coordinates) {
+      const line = turf.lineString(coords);
+      const nearest = turf.nearestPointOnLine(line, pt, { units: "miles" });
+      const d = Number(nearest?.properties?.dist);
+      if (Number.isFinite(d) && d < best) best = d;
     }
-    s += Math.max(0, 10 - Math.min(10, nk.length / 6));
-    return s;
-  };
 
-  let best = null;
-  for (const k of Object.keys(props)) {
-    const v = props[k];
-    if (v == null || v === "") continue;
-    const s = scoreKey(k);
-    if (!best || s > best.score) best = { key: k, score: s };
+    return best === Infinity ? NaN : best;
   }
 
-  // If hint match is weak, fall back to any decent string
-  if (!best || best.score < 15) {
-    const k2 = Object.keys(props).find((k) => typeof props[k] === "string" && props[k].trim().length >= 3);
-    return k2 ? String(props[k2]) : "Unknown fault";
-  }
-
-  return String(props[best.key]);
-}
-
-async function getNearestFaultText(faultsGroup, latlng) {
-  const candidates = [faultsGroup?._local, faultsGroup?._regional].filter(Boolean);
-
-  // Query a reasonable neighborhood (50 miles is fine)
-  let best = null;
-
-  for (const lyr of candidates) {
-    // eslint-disable-next-line no-await-in-loop
-    const { err, fc } = await new Promise((resolve) => {
-      lyr.query().nearby(latlng, UI.NEARBY_METERS).run((err2, fc2) => resolve({ err: err2, fc: fc2 }));
-    });
-
-    if (err || !fc?.features?.length) continue;
-
-    for (const f of fc.features) {
-      const d = getDistanceToLineMiles(latlng, f);
-      if (!Number.isFinite(d)) continue;
-
-      if (!best || d < best.dist) {
-        best = {
-          dist: d,
-          name: findBestFaultName(f.properties),
-        };
-      }
-    }
-  }
-
-  if (!best) return `❌ <strong>Nearest Fault:</strong> No nearby faults found`;
-
-  return `■ <strong>Nearest Fault:</strong> ${best.name}<br>📏 Distance: ${best.dist.toFixed(2)} mi`;
+  return NaN;
 }
 
 /* ============================================================================
@@ -1659,6 +1613,7 @@ MMI is a human-impact scale: higher values generally mean stronger shaking and g
         results.fault = await getNearestFaultText(layers.faultsLayer, e.latlng);
         results.fault += `<br><em>Distance is measured to the closest mapped fault line.</em>`;
       } catch (err) {
+        console.error("Nearest fault error:", err);
         results.fault = "■ <strong>Nearest Fault:</strong> Error fetching data.";
       } finally {
         checkDone();
