@@ -226,11 +226,11 @@ html, body {
 
   /* Center vertically */
   top: 50%;
-  left: 50%;
+  
   /* This places it near the sidebar border.
      If you change sidebar width, adjust this.
      (400px sidebar -> 200px is its halfway point) */
-  /*left: 200px;*/
+  left: 200px;
   transform: translate(-50%, -50%);
   z-index: 2000;
 }
