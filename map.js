@@ -186,69 +186,78 @@ function createBasemaps() {
  * - Non-interactive so it won't block clicks
  */
 function addCaliforniaFocusMask(map) {
-  const maskPane = map.createPane("caMaskPane");
-  maskPane.style.zIndex = 260; // above basemap, below most overlays (tweak if needed)
-  maskPane.style.pointerEvents = "none"; // IMPORTANT: don't block map clicks
+  try {
+    const maskPane = map.createPane("caMaskPane");
+    maskPane.style.zIndex = 260;
+    maskPane.style.pointerEvents = "none";
 
-  // A "world" polygon (outer ring). Keep simple and huge.
-  const worldRing = [
-    [-90, -180],
-    [-90, 180],
-    [90, 180],
-    [90, -180],
-    [-90, -180],
-  ];
+    // Big outer ring (lat,lng)
+    const worldRing = [
+      [-90, -180],
+      [-90, 180],
+      [90, 180],
+      [90, -180],
+      [-90, -180],
+    ];
 
-  const q = L.esri.query({ url: SERVICES.USA_STATES_GENERALIZED })
-    .where("STATE_NAME = 'California'")
-    .returnGeometry(true)
-    .outFields(["STATE_NAME"]);
+    // Use a FeatureLayer query (you already rely on this pattern everywhere else)
+    const states = L.esri.featureLayer({
+      url: SERVICES.USA_STATES_GENERALIZED,
+    });
 
-  q.run((err, fc) => {
-    if (err || !fc?.features?.length) {
-      console.warn("CA mask: failed to fetch CA boundary:", err);
-      return;
-    }
+    states
+      .query()
+      .where("STATE_NAME = 'California'")
+      .returnGeometry(true)
+      .run((err, fc) => {
+        if (err) {
+          console.warn("CA mask: query failed:", err);
+          return;
+        }
+        if (!fc || !fc.features || !fc.features.length) {
+          console.warn("CA mask: no CA feature returned");
+          return;
+        }
 
-    // California polygon could be Polygon or MultiPolygon
-    const caGeom = fc.features[0].geometry;
-    if (!caGeom) return;
+        const caGeom = fc.features[0].geometry;
+        if (!caGeom) {
+          console.warn("CA mask: missing geometry");
+          return;
+        }
 
-    // Convert CA polygon(s) into "holes" (inner rings) in Leaflet lat/lng order.
-    // GeoJSON polygon coords are [lng, lat], Leaflet wants [lat, lng]
-    function toLatLngRing(ringLngLat) {
-      return ringLngLat.map(([lng, lat]) => [lat, lng]);
-    }
+        // GeoJSON coords are [lng,lat] -> Leaflet wants [lat,lng]
+        const toLatLngRing = (ringLngLat) => ringLngLat.map(([lng, lat]) => [lat, lng]);
 
-    const holes = [];
-    if (caGeom.type === "Polygon") {
-      // caGeom.coordinates: [ [outer], [hole1], ... ]
-      // Use ALL rings as holes to preserve any internal holes too
-      caGeom.coordinates.forEach((ring) => holes.push(toLatLngRing(ring)));
-    } else if (caGeom.type === "MultiPolygon") {
-      // caGeom.coordinates: [ polygon1Rings, polygon2Rings, ... ]
-      caGeom.coordinates.forEach((polyRings) => {
-        polyRings.forEach((ring) => holes.push(toLatLngRing(ring)));
+        const holes = [];
+
+        if (caGeom.type === "Polygon") {
+          // coordinates: [ring1, ring2, ...]
+          caGeom.coordinates.forEach((ring) => holes.push(toLatLngRing(ring)));
+        } else if (caGeom.type === "MultiPolygon") {
+          // coordinates: [ [ring1, ring2...], [ring1, ...], ... ]
+          caGeom.coordinates.forEach((poly) => {
+            poly.forEach((ring) => holes.push(toLatLngRing(ring)));
+          });
+        } else {
+          console.warn("CA mask: unexpected geometry type:", caGeom.type);
+          return;
+        }
+
+        const latLngRings = [worldRing, ...holes];
+
+        L.polygon(latLngRings, {
+          pane: "caMaskPane",
+          stroke: false,
+          fill: true,
+          fillColor: "#000",
+          fillOpacity: 0.45,
+          interactive: false,
+        }).addTo(map);
       });
-    } else {
-      console.warn("CA mask: unexpected geometry type:", caGeom.type);
-      return;
-    }
-
-    // Build a single polygon with the world outer ring and CA holes.
-    // Leaflet polygon format: [ outerRingLatLngs, hole1LatLngs, hole2LatLngs, ... ]
-    const latLngOuter = worldRing; // already [lat,lng]
-    const latLngRings = [latLngOuter, ...holes];
-
-    L.polygon(latLngRings, {
-      pane: "caMaskPane",
-      stroke: false,
-      fill: true,
-      fillColor: "#000",
-      fillOpacity: 0.45, // tweak to taste
-      interactive: false,
-    }).addTo(map);
-  });
+  } catch (e) {
+    // If anything goes sideways, don't kill the app
+    console.warn("CA mask: failed to initialize:", e);
+  }
 }
 /* ============================================================================
   4) UI HELPERS (About + Spinner)
