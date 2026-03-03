@@ -1070,6 +1070,49 @@ function toggleAtZoom(map, layer, minZoom) {
   });
 }
 
+/**
+ * Zoom-gate a layer WITHOUT overriding user toggles.
+ * - User intent is tracked via overlayadd/overlayremove on the *gated layer*.
+ * - The map only shows the inner layer when:
+ *      (user wants it ON) && (zoom >= minZoom)
+ *
+ * Returns a LayerGroup you should register in LAYERS + LAYER_TOGGLES instead of the raw layer.
+ */
+function makeZoomGatedLayer(map, innerLayer, minZoom) {
+  const gate = L.layerGroup();
+  let intendedOn = false; // user toggle intent
+
+  function sync() {
+    const shouldShow = intendedOn && map.getZoom() >= minZoom;
+
+    if (shouldShow) {
+      if (!gate.hasLayer(innerLayer)) gate.addLayer(innerLayer);
+    } else {
+      if (gate.hasLayer(innerLayer)) gate.removeLayer(innerLayer);
+    }
+  }
+
+  // When user toggles the gate layer via L.control.layers
+  map.on("overlayadd", (e) => {
+    if (e.layer === gate) {
+      intendedOn = true;
+      sync();
+    }
+  });
+
+  map.on("overlayremove", (e) => {
+    if (e.layer === gate) {
+      intendedOn = false;
+      // remove inner layer immediately to avoid “ghost on”
+      if (gate.hasLayer(innerLayer)) gate.removeLayer(innerLayer);
+    }
+  });
+
+  map.on("zoomend", sync);
+
+  return gate;
+}
+
 /* ============================================================================
   9) UI CONTROLS (Home + Legend)
 ============================================================================ */
@@ -1606,49 +1649,73 @@ MMI is a human-impact scale: higher values generally mean stronger shaking and g
     highwayLayer: createHighwayLayer(),
     allRoadsLayer: createAllRoadsLayer(),
 
-    // POIs
-    schoolsLayer: createSchoolsLayer(),
-    healthCenters: createHealthCentersLayer(),
-    airports: createAirportsLayer(),
-    powerPlants: createPowerPlantsLayer(),
-    stateBridges: createStateBridgesLayer(),
-    localBridges: createLocalBridgesLayer(),
-    parks: createParksLayer(),
-    fireStations: createFireStationsLayer(),
-    universities: universities.layer,
-
-    // EV
-    evChargers: ev.layer,
+    // POIs (zoom-gated wrappers that respect toggle intent)
+    schoolsLayer: makeZoomGatedLayer(map, createSchoolsLayer(), UI.ZOOM_POI_MIN),
+    healthCenters: makeZoomGatedLayer(map, createHealthCentersLayer(), UI.ZOOM_POI_MIN),
+    airports: makeZoomGatedLayer(map, createAirportsLayer(), UI.ZOOM_POI_MIN),
+    powerPlants: makeZoomGatedLayer(map, createPowerPlantsLayer(), UI.ZOOM_POI_MIN),
+    stateBridges: makeZoomGatedLayer(map, createStateBridgesLayer(), UI.ZOOM_POI_MIN),
+    localBridges: makeZoomGatedLayer(map, createLocalBridgesLayer(), UI.ZOOM_POI_MIN),
+    parks: makeZoomGatedLayer(map, createParksLayer(), UI.ZOOM_POI_MIN),
+    fireStations: makeZoomGatedLayer(map, createFireStationsLayer(), UI.ZOOM_POI_MIN),
+    
+    // Universities (keep raw layer for metadata, gate separately)
+    universitiesRaw: universities.layer,
+    universities: makeZoomGatedLayer(map, universities.layer, UI.ZOOM_POI_MIN),
+    
+    // EV (gate the group layer; EV fetch already checks map.hasLayer(layer))
+    evChargers: makeZoomGatedLayer(map, ev.layer, UI.ZOOM_POI_MIN),
   };
 
   // 4) Install EV handlers (keeps EV logic isolated)
   ev.installHandlers();
 
-  // 5) Roads zoom behavior (highway vs all roads)
-  map.on("zoomend", function () {
-    const z = map.getZoom();
-    if (z <= UI.ZOOM_ROADS_SWITCH) {
-      if (map.hasLayer(LAYERS.allRoadsLayer)) map.removeLayer(LAYERS.allRoadsLayer);
-      if (!map.hasLayer(LAYERS.highwayLayer)) map.addLayer(LAYERS.highwayLayer);
-    } else {
-      if (!map.hasLayer(LAYERS.allRoadsLayer)) map.addLayer(LAYERS.allRoadsLayer);
-      if (map.hasLayer(LAYERS.highwayLayer)) map.removeLayer(LAYERS.highwayLayer);
+  // 5) Roads zoom behavior that RESPECTS user toggles
+  (function installRoadZoomSwitching() {
+    let highwayWanted = false;
+    let allRoadsWanted = false;
+  
+    function syncRoads() {
+      const z = map.getZoom();
+  
+      // Apply “wanted” state first, then zoom visibility rules
+      // Highway
+      if (highwayWanted && z <= UI.ZOOM_ROADS_SWITCH) {
+        if (!map.hasLayer(LAYERS.highwayLayer)) map.addLayer(LAYERS.highwayLayer);
+      } else {
+        if (map.hasLayer(LAYERS.highwayLayer)) map.removeLayer(LAYERS.highwayLayer);
+      }
+  
+      // All Roads
+      if (allRoadsWanted && z > UI.ZOOM_ROADS_SWITCH) {
+        if (!map.hasLayer(LAYERS.allRoadsLayer)) map.addLayer(LAYERS.allRoadsLayer);
+      } else {
+        if (map.hasLayer(LAYERS.allRoadsLayer)) map.removeLayer(LAYERS.allRoadsLayer);
+      }
     }
-  });
+  
+    map.on("overlayadd", (e) => {
+      if (e.layer === LAYERS.highwayLayer) highwayWanted = true;
+      if (e.layer === LAYERS.allRoadsLayer) allRoadsWanted = true;
+      syncRoads();
+    });
+  
+    map.on("overlayremove", (e) => {
+      if (e.layer === LAYERS.highwayLayer) highwayWanted = false;
+      if (e.layer === LAYERS.allRoadsLayer) allRoadsWanted = false;
+      syncRoads();
+    });
+  
+    map.on("zoomend", syncRoads);
+  
+    // If you want one of them ON by default, set its flag true here.
+    // highwayWanted = true;
+  
+    // initial sync
+    syncRoads();
+  })();
 
-  // 6) POIs only show when zoomed in
-  toggleAtZoom(map, LAYERS.schoolsLayer, UI.ZOOM_POI_MIN);
-  toggleAtZoom(map, LAYERS.stateBridges, UI.ZOOM_POI_MIN);
-  toggleAtZoom(map, LAYERS.localBridges, UI.ZOOM_POI_MIN);
-  toggleAtZoom(map, LAYERS.healthCenters, UI.ZOOM_POI_MIN);
-  toggleAtZoom(map, LAYERS.airports, UI.ZOOM_POI_MIN);
-  toggleAtZoom(map, LAYERS.powerPlants, UI.ZOOM_POI_MIN);
-  toggleAtZoom(map, LAYERS.evChargers, UI.ZOOM_POI_MIN);
-  toggleAtZoom(map, LAYERS.universities, UI.ZOOM_POI_MIN);
-  toggleAtZoom(map, LAYERS.fireStations, UI.ZOOM_POI_MIN);
-  toggleAtZoom(map, LAYERS.parks, UI.ZOOM_POI_MIN);
-
-  // 7) Layer controls (single source: LAYER_TOGGLES)
+  // 6) Layer controls (single source: LAYER_TOGGLES)
   const LAYER_TOGGLES = {
     // Infrastructure
     Schools: LAYERS.schoolsLayer,
@@ -1688,18 +1755,18 @@ MMI is a human-impact scale: higher values generally mean stronger shaking and g
     LAYER_TOGGLES
   ).addTo(map);
 
-  // 8) Scale, home, legend
+  // 7) Scale, home, legend
   L.control.scale({ imperial: true }).addTo(map);
   addHomeButton(map);
   addLegendControls(map);
 
-  // 9) University domain decoding (metadata fetch after layer is created)
-  LAYERS.universities.metadata((err, md) => {
+  // 8) University domain decoding (metadata fetch after layer is created)
+  LAYERS.universitiesRaw.metadata((err, md) => {
     if (err) console.warn("Colleges metadata error:", err);
     else universities.buildDomainMaps(md);
   });
 
-  // 10) Click reporting
+  // 9) Click reporting
   installClickReport(map, {
     fireHazardSRA: LAYERS.fireHazardSRA,
     fireHazardLRA: LAYERS.fireHazardLRA,
@@ -1709,6 +1776,6 @@ MMI is a human-impact scale: higher values generally mean stronger shaking and g
     drinkLayer: LAYERS.drinkLayer,
   });
 
-  // 11) Optional: start roads behavior right away (forces initial state)
+  // 10) Optional: start roads behavior right away (forces initial state)
   map.fire("zoomend");
 })();
