@@ -1171,6 +1171,101 @@ function getDistanceToLineMiles(clickLatLng, feature) {
   return NaN;
 }
 
+function findBestFaultName(props) {
+  if (!props) return null;
+
+  // Try common fault-name-ish fields first
+  const preferred = [
+    "FAULT_NAME",
+    "Fault_Name",
+    "fault_name",
+    "NAME",
+    "Name",
+    "FAULT",
+    "Fault",
+    "FAULTNAME",
+    "FaultName",
+  ];
+
+  for (const k of preferred) {
+    const v = props[k];
+    if (v != null && String(v).trim()) return String(v).trim();
+  }
+
+  // Fallback: pick the first decent-looking string value
+  for (const k of Object.keys(props)) {
+    const v = props[k];
+    if (typeof v === "string" && v.trim().length >= 3) return v.trim();
+  }
+
+  return null;
+}
+
+function queryFaultLayerNearby(faultFeatureLayer, latlng, meters) {
+  return new Promise((resolve) => {
+    if (!faultFeatureLayer?.query) return resolve({ err: "No query()", fc: null });
+
+    faultFeatureLayer
+      .query()
+      .nearby(latlng, meters)
+      .returnGeometry(true)
+      .outFields(["*"])
+      .run((err, fc) => resolve({ err, fc }));
+  });
+}
+
+/**
+ * Returns a formatted sidebar string like:
+ * ■ Nearest Fault: San Andreas Fault
+ * 📏 Distance: 1.25 mi
+ */
+async function getNearestFaultText(faultsGroupLayer, latlng) {
+  // Your group stores the real FeatureLayers here:
+  const regional = faultsGroupLayer?._regional;
+  const local = faultsGroupLayer?._local;
+
+  if (!regional || !local) {
+    // This happens if createFaultsInteractiveLayer didn’t attach them (or changed)
+    return "❌ <strong>Nearest Fault:</strong> Fault query layers not available.";
+  }
+
+  const meters = UI.NEARBY_METERS;
+
+  // Query BOTH layers; whichever has the closer line wins.
+  const [r1, r2] = await Promise.all([
+    queryFaultLayerNearby(regional, latlng, meters),
+    queryFaultLayerNearby(local, latlng, meters),
+  ]);
+
+  const features = [
+    ...(r1.fc?.features || []),
+    ...(r2.fc?.features || []),
+  ];
+
+  if (!features.length) {
+    return `❌ <strong>Nearest Fault:</strong> No faults found within ${(meters / 1609.34).toFixed(0)} miles.`;
+  }
+
+  let best = null;
+
+  for (const f of features) {
+    const d = getDistanceToLineMiles(latlng, f); // your function (Turf nearestPointOnLine)
+    if (!Number.isFinite(d)) continue;
+
+    if (!best || d < best.dist) {
+      best = {
+        dist: d,
+        name: findBestFaultName(f.properties) || "Unnamed / Unknown",
+      };
+    }
+  }
+
+  if (!best) {
+    return "❌ <strong>Nearest Fault:</strong> Could not calculate distance.";
+  }
+
+  return `■ <strong>Nearest Fault:</strong> ${best.name}<br>📏 Distance: ${best.dist.toFixed(2)} mi`;
+}
 /* ============================================================================
   8) ZOOM VISIBILITY HELPERS
 ============================================================================ */
