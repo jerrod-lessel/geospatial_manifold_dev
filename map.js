@@ -50,6 +50,10 @@ const SERVICES = {
   FAULTS_REGIONAL_QUAT: "https://gis.conservation.ca.gov/server/rest/services/CGS/FaultActivityMapCA/MapServer/17",
   FAULTS_LOCAL_QUAT: "https://gis.conservation.ca.gov/server/rest/services/CGS/FaultActivityMapCA/MapServer/21",
 
+  // Basemap focus mask
+  USA_STATES_GENERALIZED:
+    "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_States_Generalized_Boundaries/FeatureServer/0",
+  
   // Fire Hazard Severity Zones
   FIRE_SRA:
     "https://socogis.sonomacounty.ca.gov/map/rest/services/CALFIREPublic/State_Responsibility_Area_Fire_Hazard_Severity_Zones/FeatureServer/0",
@@ -175,6 +179,77 @@ function createBasemaps() {
   return { baseOSM, esriSat, cartoLight, cartoDark };
 }
 
+/**
+ * Adds a gray "focus mask" over the map with a hole for California.
+ * - Lightweight: queries a generalized state boundary once
+ * - No backend; works on GitHub Pages
+ * - Non-interactive so it won't block clicks
+ */
+function addCaliforniaFocusMask(map) {
+  const maskPane = map.createPane("caMaskPane");
+  maskPane.style.zIndex = 260; // above basemap, below most overlays (tweak if needed)
+  maskPane.style.pointerEvents = "none"; // IMPORTANT: don't block map clicks
+
+  // A "world" polygon (outer ring). Keep simple and huge.
+  const worldRing = [
+    [-90, -180],
+    [-90, 180],
+    [90, 180],
+    [90, -180],
+    [-90, -180],
+  ];
+
+  const q = L.esri.query({ url: SERVICES.USA_STATES_GENERALIZED })
+    .where("STATE_NAME = 'California'")
+    .returnGeometry(true)
+    .outFields(["STATE_NAME"]);
+
+  q.run((err, fc) => {
+    if (err || !fc?.features?.length) {
+      console.warn("CA mask: failed to fetch CA boundary:", err);
+      return;
+    }
+
+    // California polygon could be Polygon or MultiPolygon
+    const caGeom = fc.features[0].geometry;
+    if (!caGeom) return;
+
+    // Convert CA polygon(s) into "holes" (inner rings) in Leaflet lat/lng order.
+    // GeoJSON polygon coords are [lng, lat], Leaflet wants [lat, lng]
+    function toLatLngRing(ringLngLat) {
+      return ringLngLat.map(([lng, lat]) => [lat, lng]);
+    }
+
+    const holes = [];
+    if (caGeom.type === "Polygon") {
+      // caGeom.coordinates: [ [outer], [hole1], ... ]
+      // Use ALL rings as holes to preserve any internal holes too
+      caGeom.coordinates.forEach((ring) => holes.push(toLatLngRing(ring)));
+    } else if (caGeom.type === "MultiPolygon") {
+      // caGeom.coordinates: [ polygon1Rings, polygon2Rings, ... ]
+      caGeom.coordinates.forEach((polyRings) => {
+        polyRings.forEach((ring) => holes.push(toLatLngRing(ring)));
+      });
+    } else {
+      console.warn("CA mask: unexpected geometry type:", caGeom.type);
+      return;
+    }
+
+    // Build a single polygon with the world outer ring and CA holes.
+    // Leaflet polygon format: [ outerRingLatLngs, hole1LatLngs, hole2LatLngs, ... ]
+    const latLngOuter = worldRing; // already [lat,lng]
+    const latLngRings = [latLngOuter, ...holes];
+
+    L.polygon(latLngRings, {
+      pane: "caMaskPane",
+      stroke: false,
+      fill: true,
+      fillColor: "#000",
+      fillOpacity: 0.45, // tweak to taste
+      interactive: false,
+    }).addTo(map);
+  });
+}
 /* ============================================================================
   4) UI HELPERS (About + Spinner)
 ============================================================================ */
@@ -1622,6 +1697,8 @@ MMI is a human-impact scale: higher values generally mean stronger shaking and g
 
   // Add a default basemap
   basemaps.baseOSM.addTo(map);
+  // Add grey besides California
+  addCaliforniaFocusMask(map);
 
   // 3) Create layers via factories (registry pattern)
   const fire = createFireLayers();
