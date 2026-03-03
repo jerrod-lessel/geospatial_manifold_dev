@@ -125,7 +125,7 @@ html, body {
 /* remove default top margin that creates a “mystery gap” */
 #about-panel h3 {
   margin-top: 0;
-  margin-bottom: 0 /* was 0.5rem; small, readable spacing */
+  margin-bottom: 0; /* was 0.5rem; small, readable spacing */
 }
 
 /* Simple helper class used all over the site */
@@ -226,12 +226,11 @@ html, body {
 
   /* Center vertically */
   top: 50%;
-
+  left: 50%;
   /* This places it near the sidebar border.
      If you change sidebar width, adjust this.
      (400px sidebar -> 200px is its halfway point) */
-  left: 200px;
-
+  /*left: 200px;*/
   transform: translate(-50%, -50%);
   z-index: 2000;
 }
