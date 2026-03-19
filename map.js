@@ -1041,6 +1041,9 @@ function createEvChargersLayer(map) {
 
         const stations = data.fuel_stations || [];
 
+        console.log("NREL stations received:", stations.length);
+        console.log("First station sample:", stations[0]);
+
         stations.forEach((station) => {
           if (!station.latitude || !station.longitude) return;
 
