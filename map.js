@@ -114,9 +114,9 @@ const UI = {
 };
 
 // OpenChargeMap config
-const OCM = {
-  API_KEY: "a5f6a5be-8976-4e55-9e82-4f807d8830b0",
-  ATTRIBUTION: '<a href="https://openchargemap.org/site">OpenChargeMap</a>',
+const NREL = {
+  API_KEY: "FB9tVCYIfh5V0h7TXeAnci6F5ee6QKX9AA1Rlq0P",
+  ATTRIBUTION: '<a href="https://afdc.energy.gov/stations/">NREL/AFDC</a>',
 };
 
 /* ============================================================================
@@ -1010,66 +1010,87 @@ function createEvChargersLayer(map) {
     isLoading = true;
 
     const b = map.getBounds();
+    const sw = b.getSouthWest();
+    const ne = b.getNorthEast();
+
+    // NREL uses a bounding box differently - we give it a center point + radius
+    // So we calculate the center of the current map view
+    const centerLat = (sw.lat + ne.lat) / 2;
+    const centerLng = (sw.lng + ne.lng) / 2;
+
+    // Radius in miles - we use a generous number to fill the view
+    // 100 miles covers most zoom levels nicely
+    const radiusMiles = 100;
+
     const url =
-      `https://api.openchargemap.io/v3/poi/?output=json` +
-      `&boundingbox=(${b.getSouthWest().lat},${b.getSouthWest().lng}),(${b.getNorthEast().lat},${b.getNorthEast().lng})` +
-      `&maxresults=${UI.EV_MAX_RESULTS}` +
-      `&key=${OCM.API_KEY}`;
+      `https://developer.nlr.gov/api/alt-fuel-stations/v1.json` +
+      `?api_key=${NREL.API_KEY}` +
+      `&fuel_type=ELEC` +
+      `&latitude=${centerLat}` +
+      `&longitude=${centerLng}` +
+      `&radius=${radiusMiles}` +
+      `&status=E` +
+      `&access=public` +
+      `&state=CA` +
+      `&limit=500`;
 
     fetch(url)
       .then((r) => r.json())
       .then((data) => {
         layer.clearLayers();
 
-        data.forEach((charger) => {
-          const ai = charger.AddressInfo || {};
-          if (!ai.Latitude || !ai.Longitude) return;
+        const stations = data.fuel_stations || [];
 
-          let totalPorts = 0;
-          (charger.Connections || []).forEach((c) => (totalPorts += c.Quantity || 1));
+        stations.forEach((station) => {
+          if (!station.latitude || !station.longitude) return;
 
-          const status = charger.StatusType?.Title ?? "Unknown Status";
-          const usage = charger.UsageType?.Title ?? "Usage details not specified";
-          const network = charger.OperatorInfo?.Title ?? "Unknown Network";
+          // Charger level counts
+          const level1 = station.ev_level1_evse_num || 0;
+          const level2 = station.ev_level2_evse_num || 0;
+          const dcFast = station.ev_dc_fast_num || 0;
+          const totalPorts = level1 + level2 + dcFast;
 
-          let equipmentInfo = "<li>No equipment details</li>";
-          if (charger.Connections?.length) {
-            equipmentInfo = charger.Connections
-              .map(
-                (conn) => `
-                  <li>
-                    <strong>${conn.ConnectionType?.Title ?? "Connector"} (${conn.Quantity || 1})</strong>:
-                    <br> ${conn.PowerKW ?? "N/A"} kW
-                    <br> ${conn.Voltage ?? "N/A"} V
-                    <br> ${conn.Amps ?? "N/A"} A
-                    <br> (${conn.Level?.Title ?? "Level info unavailable"})
-                  </li>`
-              )
-              .join("");
-          }
+          const network = station.ev_network || "Unknown Network";
+          const hours = station.access_days_time || "Hours not listed";
+          const connectors = station.ev_connector_types
+            ? station.ev_connector_types.join(", ")
+            : "Not listed";
 
-          const marker = L.marker([ai.Latitude, ai.Longitude], {
-            icon: L.divIcon({ html: "🔋", className: "evcharger-icon", iconSize: L.point(30, 30) }),
+          const marker = L.marker([station.latitude, station.longitude], {
+            icon: L.divIcon({
+              html: "🔋",
+              className: "evcharger-icon",
+              iconSize: L.point(30, 30),
+            }),
           });
 
           const popupContent = `
             <div class="ev-popup">
-              <strong>${ai.Title || "EV Charger"}</strong><br><hr>
-              <strong>Status:</strong> ${status} (${usage})<br>
+              <strong>${station.station_name || "EV Charger"}</strong><br>
+              <hr>
+              <strong>Address:</strong> ${station.street_address || "N/A"}, ${station.city || ""}<br>
               <strong>Network:</strong> ${network}<br>
-              <strong>Total Charging Ports:</strong> ${totalPorts}<br><br>
-              <strong>Equipment Breakdown:</strong>
-              <ul>${equipmentInfo}</ul>
+              <strong>Hours:</strong> ${hours}<br>
+              <strong>Total Ports:</strong> ${totalPorts}<br>
+              <strong>Level 1:</strong> ${level1} ports<br>
+              <strong>Level 2:</strong> ${level2} ports<br>
+              <strong>DC Fast:</strong> ${dcFast} ports<br>
+              <strong>Connectors:</strong> ${connectors}<br>
             </div>
           `;
 
-          marker.bindPopup(popupContent, { maxHeight: UI.POPUP_MAX_HEIGHT, autoPan: true }).addTo(layer);
+          marker
+            .bindPopup(popupContent, {
+              maxHeight: UI.POPUP_MAX_HEIGHT,
+              autoPan: true,
+            })
+            .addTo(layer);
         });
 
         isLoading = false;
       })
       .catch((err) => {
-        console.error("OpenChargeMap error:", err);
+        console.error("NREL EV stations error:", err);
         isLoading = false;
       });
   }
@@ -1081,14 +1102,14 @@ function createEvChargersLayer(map) {
 
     map.on("overlayadd", (e) => {
       if (e.layer === layer) {
-        map.attributionControl.addAttribution(OCM.ATTRIBUTION);
-        fetchInView(); // immediate fetch on enable
+        map.attributionControl.addAttribution(NREL.ATTRIBUTION);
+        fetchInView();
       }
     });
 
     map.on("overlayremove", (e) => {
       if (e.layer === layer) {
-        map.attributionControl.removeAttribution(OCM.ATTRIBUTION);
+        map.attributionControl.removeAttribution(NREL.ATTRIBUTION);
         layer.clearLayers();
       }
     });
