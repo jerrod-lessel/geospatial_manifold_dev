@@ -55,7 +55,7 @@ const SERVICES = {
     "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_States_Generalized_Boundaries/FeatureServer/0",
   
   CA_BOUNDARY_DETAILED: 
-    "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_State_Boundaries/FeatureServer/0",
+    "https://services.arcgis.com/ue9rwulIoeLEI9bj/arcgis/rest/services/US_StateBoundaries/FeatureServer/0",
   
   // Fire Hazard Severity Zones
   FIRE_SRA:
@@ -210,7 +210,7 @@ function addCaliforniaFocusMask(map) {
 
     states
       .query()
-      .where("Name = 'California'")
+      .where("NAME = 'California'")
       .returnGeometry(true)
       .run((err, fc) => {
         if (err) {
