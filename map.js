@@ -1917,7 +1917,7 @@ MMI is a human-impact scale: higher values generally mean stronger shaking and g
     universities: makeZoomGatedLayer(map, universities.layer, UI.ZOOM_POI_MIN),
     
     // EV (gate the group layer; EV fetch already checks map.hasLayer(layer))
-    evChargers: makeZoomGatedLayer(map, ev.layer, UI.ZOOM_POI_MIN),
+    evChargers: ev.layer,
   };
 
   // 4) Install EV handlers (keeps EV logic isolated)
