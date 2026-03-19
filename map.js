@@ -1029,7 +1029,7 @@ function createEvChargersLayer(map) {
       `&latitude=${centerLat}` +
       `&longitude=${centerLng}` +
       `&radius=${radiusMiles}` +
-      `&status=E` +
+      //`&status=E` +
       //`&access=public` +
       //`&state=CA` +
       `&limit=500`;
