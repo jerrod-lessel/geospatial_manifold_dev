@@ -210,7 +210,7 @@ function addCaliforniaFocusMask(map) {
 
     states
       .query()
-      .where("NAME = 'California'")
+      .where("Name = 'California'")
       .returnGeometry(true)
       .run((err, fc) => {
         if (err) {
