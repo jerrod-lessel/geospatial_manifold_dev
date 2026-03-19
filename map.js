@@ -54,6 +54,9 @@ const SERVICES = {
   USA_STATES_GENERALIZED:
     "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_States_Generalized_Boundaries/FeatureServer/0",
   
+  CA_BOUNDARY_DETAILED: 
+    "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_State_Boundaries/FeatureServer/0",
+  
   // Fire Hazard Severity Zones
   FIRE_SRA:
     "https://socogis.sonomacounty.ca.gov/map/rest/services/CALFIREPublic/State_Responsibility_Area_Fire_Hazard_Severity_Zones/FeatureServer/0",
@@ -202,12 +205,12 @@ function addCaliforniaFocusMask(map) {
 
     // Use a FeatureLayer query (you already rely on this pattern everywhere else)
     const states = L.esri.featureLayer({
-      url: SERVICES.USA_STATES_GENERALIZED,
+      url: SERVICES.CA_BOUNDARY_DETAILED,
     });
 
     states
       .query()
-      .where("STATE_NAME = 'California'")
+      .where("NAME = 'California'")
       .returnGeometry(true)
       .run((err, fc) => {
         if (err) {
