@@ -1023,7 +1023,7 @@ function createEvChargersLayer(map) {
     const radiusMiles = 100;
 
     const url =
-      `https://developer.nlr.gov/api/alt-fuel-stations/v1.json` +
+      `https://developer.nlr.gov/api/alt-fuel-stations/v1/nearest.json` +
       `?api_key=${NREL.API_KEY}` +
       `&fuel_type=ELEC` +
       `&latitude=${centerLat}` +
