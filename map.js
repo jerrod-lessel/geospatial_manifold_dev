@@ -1030,8 +1030,8 @@ function createEvChargersLayer(map) {
       `&longitude=${centerLng}` +
       `&radius=${radiusMiles}` +
       `&status=E` +
-      `&access=public` +
-      `&state=CA` +
+      //`&access=public` +
+      //`&state=CA` +
       `&limit=500`;
 
     fetch(url)
