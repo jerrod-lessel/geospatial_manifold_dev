@@ -1,6 +1,6 @@
 /* ============================================================================
   map.js - Geospatial Manifold (Leaflet + Esri Leaflet)
-  VERSION: 2026-02-28.a
+  VERSION: 2026-03-19.a
 
   WHAT THIS FILE DOES:
   - Initializes the map + basemap options
