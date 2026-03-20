@@ -1032,7 +1032,7 @@ function createEvChargersLayer(map) {
       //`&status=E` +
       //`&access=public` +
       //`&state=CA` +
-      `&limit=500`;
+      `&limit=200`;
 
     fetch(url)
       .then((r) => r.json())
