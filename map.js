@@ -1,6 +1,6 @@
 /* ============================================================================
   map.js - Geospatial Manifold (Leaflet + Esri Leaflet)
-  VERSION: 2026-04-06.a
+  VERSION: 2026-04-06.b
 
   WHAT THIS FILE DOES:
   - Initializes the map + basemap options
@@ -107,6 +107,8 @@ function $(id) {
 function createMap() {
   const m = L.map("map").setView([DEFAULT_VIEW.lat, DEFAULT_VIEW.lng], DEFAULT_VIEW.zoom);
   setTimeout(() => m.invalidateSize(), 200);
+  // Expose so initAboutToggle can call invalidateSize after panel resize
+  window._leafletMap = m;
   return m;
 }
 
@@ -172,6 +174,10 @@ function addCaliforniaFocusMask(map) {
 function initAboutToggle() {
   $("about-toggle")?.addEventListener("click", function () {
     $("about-panel")?.classList.toggle("hidden");
+    // Give the browser one frame to reflow, then tell Leaflet the map size changed
+    setTimeout(() => {
+      if (window._leafletMap) window._leafletMap.invalidateSize();
+    }, 50);
   });
 }
 
@@ -725,7 +731,21 @@ function findBestFaultName(props) {
 function queryFaultLayerNearby(faultFeatureLayer, latlng, meters) {
   return new Promise((resolve) => {
     if (!faultFeatureLayer?.query) return resolve({ err: "No query()", fc: null });
-    faultFeatureLayer.query().nearby(latlng, meters).returnGeometry(true).outFields(["*"]).run((err, fc) => resolve({ err, fc }));
+
+    // .nearby() is unreliable on line feature layers in Esri Leaflet.
+    // Instead we build a bounding box around the click point and use .within().
+    // We convert meters to degrees (rough but good enough for a search radius).
+    const degOffset = meters / 111320; // ~111,320 meters per degree latitude
+    const sw = L.latLng(latlng.lat - degOffset, latlng.lng - degOffset);
+    const ne = L.latLng(latlng.lat + degOffset, latlng.lng + degOffset);
+    const bounds = L.latLngBounds(sw, ne);
+
+    faultFeatureLayer
+      .query()
+      .within(bounds)
+      .returnGeometry(true)
+      .outFields(["*"])
+      .run((err, fc) => resolve({ err, fc }));
   });
 }
 
