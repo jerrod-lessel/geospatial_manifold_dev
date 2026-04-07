@@ -1,6 +1,6 @@
 /* ============================================================================
   map.js - Geospatial Manifold (Leaflet + Esri Leaflet)
-  VERSION: 2026-04-06.b
+  VERSION: 2026-04-06.a
 
   WHAT THIS FILE DOES:
   - Initializes the map + basemap options
@@ -730,22 +730,28 @@ function findBestFaultName(props) {
 
 function queryFaultLayerNearby(faultFeatureLayer, latlng, meters) {
   return new Promise((resolve) => {
-    if (!faultFeatureLayer?.query) return resolve({ err: "No query()", fc: null });
+    if (!faultFeatureLayer?.query) {
+      console.warn("[Faults] No query() method on layer");
+      return resolve({ err: "No query()", fc: null });
+    }
 
-    // .nearby() is unreliable on line feature layers in Esri Leaflet.
-    // Instead we build a bounding box around the click point and use .within().
-    // We convert meters to degrees (rough but good enough for a search radius).
-    const degOffset = meters / 111320; // ~111,320 meters per degree latitude
+    const degOffset = meters / 111320;
     const sw = L.latLng(latlng.lat - degOffset, latlng.lng - degOffset);
     const ne = L.latLng(latlng.lat + degOffset, latlng.lng + degOffset);
     const bounds = L.latLngBounds(sw, ne);
+
+    console.log("[Faults] Querying bounds:", bounds.toBBoxString(), "| url:", faultFeatureLayer.options?.url);
 
     faultFeatureLayer
       .query()
       .within(bounds)
       .returnGeometry(true)
       .outFields(["*"])
-      .run((err, fc) => resolve({ err, fc }));
+      .run((err, fc) => {
+        if (err) console.warn("[Faults] Query error:", err);
+        else console.log("[Faults] Features returned:", fc?.features?.length ?? 0, fc?.features?.[0]?.properties);
+        resolve({ err, fc });
+      });
   });
 }
 
