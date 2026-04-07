@@ -746,7 +746,6 @@ function queryFaultLayerNearby(faultFeatureLayer, latlng, meters) {
       .query()
       .within(bounds)
       .returnGeometry(true)
-      .outFields(["*"])
       .run((err, fc) => {
         if (err) console.warn("[Faults] Query error:", err);
         else console.log("[Faults] Features returned:", fc?.features?.length ?? 0, fc?.features?.[0]?.properties);
