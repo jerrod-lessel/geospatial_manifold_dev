@@ -1,114 +1,123 @@
 /* ============================================================================
-   style.css - Site styling for Geospatial Manifold
-   VERSION: 2026-02-28.a
+   style.css - Geospatial Manifold
+   VERSION: 2026-04-06.a
 
-   GOALS:
-   - Full viewport app layout (no page scrolling)
+   LAYOUT OVERVIEW:
+   - Full viewport map (no sidebar)
    - Sticky top banner
-   - Sidebar + map split layout
-   - Rounded corners and subtle borders
-   - Avoid "double scrollbars" in Leaflet popups
-   - Mobile stacking layout under 768px
+   - Slide panel overlays map from the right on click
+   - Dashboard cards inside panel with charts + text
+   - Mobile responsive (panel becomes bottom sheet)
 ============================================================================ */
 
 /* ============================================================================
-   1) GLOBAL PAGE RESET
+   1) FONTS + GLOBAL RESET
 ============================================================================ */
+
+:root {
+  --font-main: 'DM Sans', Arial, sans-serif;
+  --font-mono: 'DM Mono', monospace;
+
+  /* Banner */
+  --banner-bg-start: #0c1f2c;
+  --banner-bg-end:   #1e3d52;
+  --banner-height:   62px;
+
+  /* Panel */
+  --panel-width:        360px;
+  --panel-bg:           #1a2b38;
+  --panel-bg-card:      #213345;
+  --panel-bg-card-alt:  #1e3047;
+  --panel-border:       rgba(255,255,255,0.08);
+  --panel-text:         #e8eef2;
+  --panel-text-muted:   #7a9ab0;
+  --panel-text-label:   #4d7a96;
+  --panel-accent:       #3ecfcf;
+  --panel-accent-warm:  #f59e3a;
+  --panel-header-bg:    #0f1e2b;
+  --panel-footer-bg:    #0f1e2b;
+  --panel-tab-active:   #3ecfcf;
+  --panel-tab-bg:       #152433;
+  --panel-radius:       10px;
+
+  /* Hazard colors */
+  --haz-red:    #e05252;
+  --haz-orange: #f0833a;
+  --haz-yellow: #e8c840;
+  --haz-green:  #4cbe8a;
+  --haz-blue:   #4a9ede;
+}
 
 html, body {
   margin: 0;
   padding: 0;
-
-  /* Make sure the app can fill full screen height */
   height: 100%;
-
-  /* Global font choice */
-  font-family: Arial, sans-serif;
-
-  /* IMPORTANT:
-     We generally want the app to manage its own scroll regions
-     (sidebar content, legend panel, popups). Prevent global body scrolling. */
+  font-family: var(--font-main);
   overflow: hidden;
-
-  /* Background color visible if something fails (black) */
-  background-color: black;
+  background-color: #0c1f2c;
 }
 
 /* ============================================================================
-   2) TOP BANNER / HEADER
+   2) TOP BANNER
 ============================================================================ */
 
 #top-banner {
   display: flex;
-  justify-content: space-between; /* left side + about button */
+  justify-content: space-between;
   align-items: center;
-
-  background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
-
-  /* This padding is what gives it that "banner" spacing */
-  padding: 0.75rem 1rem;
-
-  border-bottom: 2px solid #0f2027;
-
-  /* Sticky keeps it visible at top */
+  background: linear-gradient(to right, var(--banner-bg-start), var(--banner-bg-end));
+  padding: 0 1.25rem;
+  height: var(--banner-height);
+  border-bottom: 1px solid rgba(62,207,207,0.2);
   position: sticky;
   top: 0;
-  z-index: 1000;
-
+  z-index: 1100;
   color: white;
 }
 
-/* Left side grouping: logo + titles */
 #left-banner {
   display: flex;
   align-items: center;
-  gap: 0.5rem; /* space between logo and text */
+  gap: 0.6rem;
 }
 
-/* Site logo sizing */
 #site-logo {
-  height: 45px;
+  height: 40px;
   width: auto;
 }
 
-/* Titles stack vertically */
 #titles {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
 }
 
-/* Main title styling */
 #main-title {
-  font-size: 1.5rem;
-  font-weight: bold;
-  letter-spacing: 1px;
-  text-shadow:
-    -1px -1px 0 #000,
-     1px -1px 0 #000,
-    -1px  1px 0 #000,
-     1px  1px 0 #000;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #e8eef2;
 }
 
-/* Subtitle styling */
 #subtitle {
-  font-size: 0.85rem;
-  opacity: 0.85;
+  font-size: 0.78rem;
+  color: rgba(232,238,242,0.6);
 }
 
-/* About button */
 #about-toggle {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  border: 1px solid #fff;
-  border-radius: 4px;
-  padding: 0.25rem 0.5rem;
+  background: rgba(62,207,207,0.12);
+  color: var(--panel-accent);
+  border: 1px solid rgba(62,207,207,0.35);
+  border-radius: 6px;
+  padding: 0.3rem 0.8rem;
+  font-family: var(--font-main);
+  font-size: 0.82rem;
   cursor: pointer;
-  transition: background 0.3s;
+  transition: background 0.2s;
 }
 
 #about-toggle:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+  background: rgba(62,207,207,0.22);
 }
 
 /* ============================================================================
@@ -116,142 +125,520 @@ html, body {
 ============================================================================ */
 
 #about-panel {
-  background: #5A5A5A;
-  color: #eeeeee;
-  padding: 0.75rem 1rem 0.5rem; /* top, left/right, bottom */
-  font-size: 0.95rem;
+  background: #152433;
+  color: #c0d4e0;
+  padding: 0.85rem 1.25rem;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  border-bottom: 1px solid rgba(62,207,207,0.15);
 }
 
-/* remove default top margin that creates a “mystery gap” */
 #about-panel h3 {
-  margin-top: 0;
-  margin-bottom: 0; /* was 0.5rem; small, readable spacing */
+  margin: 0 0 0.4rem;
+  color: var(--panel-accent);
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
-/* Simple helper class used all over the site */
+#about-panel p {
+  margin: 0 0 0.4rem;
+}
+
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 /* ============================================================================
-   4) MAIN APP LAYOUT: SIDEBAR + MAP
+   4) MAIN CONTAINER + MAP — full viewport
 ============================================================================ */
 
-/* Container holds sidebar + map */
 #container {
-  display: flex;
-
-  /* Take the viewport height minus header height.
-     If you change header padding/font-size, adjust this 80px. */
-  height: calc(100vh - 80px);
-
-  width: 100%;
-  border: 3px solid black;
-
-  /* Prevent random scroll bars from layout overflow */
-  overflow: hidden;
-
-  background-color: #000000;
-
-  /* important for nested scrolling in flex layouts */
-  min-height: 0;
-}
-
-/* Sidebar (left) */
-#sidebar {
-  width: 400px;
-  padding: 15px;
-
-  display: flex;
-  flex-direction: column;
-
-  box-sizing: border-box;
-
-  /* Sidebar scrolls internally */
-  overflow-y: auto;
-
-  /* Must fill its available height to avoid weird scrolling */
-  min-height: 0;  
-  max-height: 100%;
-
-  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-
-  border-radius: 13px;
-  background-color: #5A5A5A;
-  color: #eeeeee;
-}
-
-/* Report text area can grow and scroll if needed */
-#report-content {
-  font-size: 0.95rem;
-  line-height: 1.4;
-  margin-top: 10px;
-  flex: 1;
-  min-height: 0;
-
-  /* Let it use remaining vertical space */
-  flex-grow: 1;
-
-  /* internal scrolling */
-  overflow-y: auto;
-}
-
-/* Map wrapper (right side) - contains the map + spinner overlay */
-#map-wrap {
-  flex-grow: 1;
-  position: relative; /* required so spinner can be positioned inside */
-}
-
-/* Leaflet map container must have a defined size */
-#map {
-  height: 100%;
-  width: 100%;
-
-  border: 2px solid black;
-  border-radius: 13px;
-
-  /* Stops map tiles from spilling outside rounded corners */
-  overflow: hidden;
-
   position: relative;
+  width: 100%;
+  height: calc(100vh - var(--banner-height));
+  overflow: hidden;
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   z-index: 1;
 }
 
 /* ============================================================================
-   5) LOADING SPINNER
+   5) SLIDE PANEL
 ============================================================================ */
 
-#loading-spinner {
+#slide-panel {
   position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--panel-width);
+  background: var(--panel-bg);
+  border-left: 1px solid var(--panel-border);
+  z-index: 800;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 
-  /* Center vertically */
-  top: 50%;
-  
-  /* This places it near the sidebar border.
-     If you change sidebar width, adjust this.
-     (400px sidebar -> 200px is its halfway point) */
-  left: 200px;
-  transform: translate(-50%, -50%);
-  z-index: 2000;
+  /* slide transition */
+  transform: translateX(0);
+  transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -6px 0 32px rgba(0,0,0,0.45);
 }
 
-.spinner {
-  border: 8px solid #f3f3f3;
-  border-top: 8px solid #2c5364;
+.slide-panel-closed {
+  transform: translateX(100%) !important;
+}
+
+/* ---- Panel Header ---- */
+
+#panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  background: var(--panel-header-bg);
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid var(--panel-border);
+  flex-shrink: 0;
+}
+
+#panel-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+#panel-coords {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--panel-accent);
+  letter-spacing: 0.3px;
+}
+
+#panel-location-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--panel-text);
+  line-height: 1.3;
+}
+
+#panel-close-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--panel-text-muted);
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-left: 10px;
+  transition: background 0.2s, color 0.2s;
+}
+
+#panel-close-btn:hover {
+  background: rgba(255,255,255,0.12);
+  color: var(--panel-text);
+}
+
+/* ---- Panel Spinner ---- */
+
+#panel-spinner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--panel-header-bg);
+  border-bottom: 1px solid var(--panel-border);
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  color: var(--panel-text-muted);
+}
+
+.panel-spinner-inner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(62,207,207,0.2);
+  border-top: 2px solid var(--panel-accent);
   border-radius: 50%;
-  width: 30px;
-  height: 30px;
-  animation: spin 1s linear infinite;
+  animation: panelSpin 0.8s linear infinite;
+  flex-shrink: 0;
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+@keyframes panelSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---- Tab Bar ---- */
+
+#panel-tabs {
+  display: flex;
+  gap: 0;
+  background: var(--panel-tab-bg);
+  border-bottom: 1px solid var(--panel-border);
+  flex-shrink: 0;
+}
+
+.panel-tab {
+  flex: 1;
+  padding: 10px 4px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--panel-text-muted);
+  font-family: var(--font-main);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+  letter-spacing: 0.2px;
+}
+
+.panel-tab:hover {
+  color: var(--panel-text);
+}
+
+.panel-tab.active {
+  color: var(--panel-tab-active);
+  border-bottom-color: var(--panel-tab-active);
+}
+
+/* ---- Panel Body (scrollable) ---- */
+
+#panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(62,207,207,0.25) transparent;
+}
+
+#panel-body::-webkit-scrollbar {
+  width: 5px;
+}
+#panel-body::-webkit-scrollbar-thumb {
+  background: rgba(62,207,207,0.25);
+  border-radius: 3px;
+}
+
+/* ---- Welcome state ---- */
+
+#panel-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 14px;
+  padding: 40px 20px;
+  color: var(--panel-text-muted);
+  flex: 1;
+}
+
+.welcome-icon {
+  font-size: 2.5rem;
+  opacity: 0.5;
+}
+
+#panel-welcome p {
+  font-size: 0.85rem;
+  line-height: 1.65;
+  max-width: 260px;
+  margin: 0;
 }
 
 /* ============================================================================
-   6) LEAFLET CONTROL BUTTON STYLES
-   - Matches your “nice white control” look
+   6) DASHBOARD CARDS
+============================================================================ */
+
+.dash-card {
+  background: var(--panel-bg-card);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  padding: 12px 14px;
+}
+
+.dash-card-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--panel-text-label);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 8px;
+}
+
+.dash-card-value {
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: var(--panel-text);
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+
+.dash-card-sub {
+  font-size: 0.75rem;
+  color: var(--panel-text-muted);
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.dash-card-explain {
+  font-size: 0.78rem;
+  color: var(--panel-text-muted);
+  line-height: 1.6;
+  border-top: 1px solid var(--panel-border);
+  padding-top: 9px;
+  margin-top: 10px;
+}
+
+/* ---- Hazard Badges ---- */
+
+.haz-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+  letter-spacing: 0.2px;
+}
+
+.haz-badge-red    { background: rgba(224,82,82,0.18);  color: #f08080; border: 1px solid rgba(224,82,82,0.35); }
+.haz-badge-orange { background: rgba(240,131,58,0.18); color: #f0a060; border: 1px solid rgba(240,131,58,0.35); }
+.haz-badge-yellow { background: rgba(232,200,64,0.15); color: #e8d060; border: 1px solid rgba(232,200,64,0.3); }
+.haz-badge-green  { background: rgba(76,190,138,0.15); color: #5dd4a0; border: 1px solid rgba(76,190,138,0.3); }
+.haz-badge-blue   { background: rgba(74,158,222,0.15); color: #6ab4e8; border: 1px solid rgba(74,158,222,0.3); }
+.haz-badge-gray   { background: rgba(255,255,255,0.08); color: var(--panel-text-muted); border: 1px solid var(--panel-border); }
+
+/* ---- Severity Bar ---- */
+
+.severity-track {
+  height: 7px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 8px 0 4px;
+}
+
+.severity-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.severity-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.67rem;
+  color: var(--panel-text-label);
+  margin-top: 2px;
+}
+
+/* ---- Percentile Bar Rows ---- */
+
+.pct-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.pct-name {
+  font-size: 0.75rem;
+  color: var(--panel-text-muted);
+  width: 90px;
+  flex-shrink: 0;
+}
+
+.pct-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(255,255,255,0.07);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.pct-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.pct-val {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--panel-text);
+  min-width: 32px;
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+/* ---- MMI Scale ---- */
+
+.mmi-scale {
+  display: flex;
+  gap: 3px;
+  margin: 10px 0 4px;
+}
+
+.mmi-box {
+  flex: 1;
+  height: 20px;
+  border-radius: 3px;
+  transition: opacity 0.3s;
+}
+
+.mmi-box.inactive {
+  opacity: 0.18;
+}
+
+.mmi-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  color: var(--panel-text-label);
+}
+
+/* ---- Stat Row (3-up) ---- */
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.stat-cell {
+  background: var(--panel-header-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  padding: 8px 8px 7px;
+  text-align: center;
+}
+
+.stat-cell-val {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--panel-text);
+  font-family: var(--font-mono);
+  line-height: 1.2;
+}
+
+.stat-cell-label {
+  font-size: 0.62rem;
+  color: var(--panel-text-label);
+  margin-top: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* ---- Fault Card ---- */
+
+.fault-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.fault-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--panel-accent-warm);
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.fault-name-text {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--panel-text);
+  line-height: 1.3;
+}
+
+.fault-dist-text {
+  font-size: 0.75rem;
+  color: var(--panel-text-muted);
+  margin-top: 3px;
+  font-family: var(--font-mono);
+}
+
+/* ---- No data state ---- */
+
+.no-data-card {
+  background: var(--panel-bg-card);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  padding: 12px 14px;
+  font-size: 0.78rem;
+  color: var(--panel-text-muted);
+  font-style: italic;
+}
+
+/* ============================================================================
+   7) PANEL FOOTER
+============================================================================ */
+
+#panel-footer {
+  background: var(--panel-footer-bg);
+  border-top: 1px solid var(--panel-border);
+  padding: 12px 14px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#export-pdf-btn {
+  width: 100%;
+  padding: 9px;
+  background: rgba(62,207,207,0.1);
+  border: 1px solid rgba(62,207,207,0.35);
+  border-radius: 7px;
+  color: var(--panel-accent);
+  font-family: var(--font-main);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#export-pdf-btn:hover {
+  background: rgba(62,207,207,0.2);
+}
+
+#export-pdf-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#donation-card {
+  text-align: center;
+}
+
+.donation-text {
+  font-size: 0.75rem;
+  color: var(--panel-text-label);
+}
+
+.donation-text a {
+  color: var(--panel-accent-warm);
+  text-decoration: none;
+}
+
+.donation-text a:hover {
+  text-decoration: underline;
+}
+
+/* ============================================================================
+   8) LEAFLET CONTROL OVERRIDES
 ============================================================================ */
 
 .home-button {
@@ -260,9 +647,8 @@ html, body {
   background-color: #fff;
   border: 1px solid #ccc;
   border-radius: 4px;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
+  box-shadow: 0 1px 5px rgba(0,0,0,0.65);
   cursor: pointer;
-
   display: flex;
   align-items: center;
   justify-content: center;
@@ -272,15 +658,11 @@ html, body {
 #home-button .legend-icon {
   font-size: 25px;
   line-height: 1;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
   width: 100%;
   height: 100%;
-
-  /* tiny vertical nudge to look centered */
   transform: translateY(-2px);
 }
 
@@ -290,12 +672,10 @@ html, body {
   background-color: #fff;
   border: 1px solid #ccc;
   border-radius: 4px;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
-
+  box-shadow: 0 1px 5px rgba(0,0,0,0.65);
   display: flex;
   align-items: center;
   justify-content: center;
-
   cursor: pointer;
 }
 
@@ -310,7 +690,7 @@ html, body {
 }
 
 /* ============================================================================
-   7) LEGEND PANEL
+   9) LEGEND PANEL
 ============================================================================ */
 
 .legend-panel {
@@ -318,25 +698,15 @@ html, body {
   padding: 10px;
   border: 2px solid #000;
   border-radius: 4px;
-
   max-height: 70vh;
   width: 250px;
-
   font-size: 0.9rem;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
   z-index: 999;
-
-  /* Allows internal scrolling without page scroll */
   overflow-y: auto;
-
-  /* iOS smooth scrolling */
   -webkit-overflow-scrolling: touch;
-
-  /* Helps prevent scroll chaining weirdness */
   overscroll-behavior: contain;
   touch-action: auto;
-
   padding-bottom: 1rem;
 }
 
@@ -350,14 +720,6 @@ html, body {
   margin: 2px 0;
 }
 
-.legend-section i {
-  width: 16px;
-  height: 16px;
-  display: inline-block;
-  margin-right: 6px;
-  border: 1px solid #888;
-}
-
 .legend-swatch {
   display: inline-block;
   width: 12px;
@@ -368,19 +730,10 @@ html, body {
   vertical-align: middle;
 }
 
-/* Optional: custom scrollbar styling (Chromium/WebKit only) */
-.legend-panel::-webkit-scrollbar {
-  width: 8px;
-}
-.legend-panel::-webkit-scrollbar-thumb {
-  background-color: #888;
-  border-radius: 4px;
-}
-.legend-panel::-webkit-scrollbar-thumb:hover {
-  background-color: #555;
-}
+.legend-panel::-webkit-scrollbar { width: 8px; }
+.legend-panel::-webkit-scrollbar-thumb { background-color: #888; border-radius: 4px; }
+.legend-panel::-webkit-scrollbar-thumb:hover { background-color: #555; }
 
-/* Small horizontal color ramps for legend sections */
 .legend-ramp {
   display: flex;
   gap: 2px;
@@ -403,8 +756,7 @@ html, body {
 }
 
 /* ============================================================================
-   8) ICON SIZES (Emoji markers)
-   - These class names match map.js divIcon usage
+   10) ICON SIZES (Emoji markers)
 ============================================================================ */
 
 .school-icon,
@@ -419,7 +771,6 @@ html, body {
   line-height: 1;
 }
 
-/* Fire emoji helper to center nicely */
 .fire-icon {
   display: flex;
   justify-content: center;
@@ -427,67 +778,57 @@ html, body {
   line-height: 1;
 }
 
-/* Fire icon size categories */
 .fire-icon-sm { font-size: 15px; }
 .fire-icon-md { font-size: 25px; }
 .fire-icon-lg { font-size: 40px; }
 .fire-icon-xl { font-size: 50px; }
 
 /* ============================================================================
-   9) POPUP SCROLLBAR FIX (VERY IMPORTANT)
-   - Prevent “double scrollbars” inside Leaflet popups
-   - Strategy:
-       * Leaflet popup container: do NOT scroll.
-       * Only your inner .ev-popup can scroll.
+   11) POPUP STYLES
 ============================================================================ */
 
-/* Leaflet’s default popup content wrapper */
 .leaflet-popup-content {
-  /* Avoid forcing scroll on Leaflet’s wrapper */
   max-height: none;
   overflow: visible;
 }
 
-/* Your EV popup wrapper inside popupContent */
 .ev-popup {
-  /* The inner content gets the scrolling, not Leaflet itself */
-  max-height: 220px;    /* should match UI.POPUP_MAX_HEIGHT */
+  max-height: 220px;
   overflow-y: auto;
-
-  /* Helps reduce weird iOS bounce + chaining */
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-
-  /* Optional: small padding so the scrollbar doesn’t sit on text */
   padding-right: 6px;
 }
 
 /* ============================================================================
-   10) MOBILE RESPONSIVE LAYOUT
+   12) MOBILE RESPONSIVE
 ============================================================================ */
 
 @media (max-width: 768px) {
-  /* Stack sidebar on top, map below */
-  #container {
-    flex-direction: column;
+  :root {
+    --panel-width: 100vw;
   }
 
-  /* Sidebar becomes full width and partial height */
-  #sidebar {
+  #slide-panel {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
     width: 100%;
-    height: 45vh;
-    border-right: none;
+    height: 65vh;
+    border-left: none;
+    border-top: 1px solid var(--panel-border);
+    box-shadow: 0 -6px 32px rgba(0,0,0,0.5);
+
+    transform: translateY(0);
+    transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Map takes remaining space */
-  #map {
-    height: calc(100vh - 80px - 45vh);
+  .slide-panel-closed {
+    transform: translateY(100%) !important;
   }
 
-  /* Legend panel: slightly taller scrolling area */
   .legend-panel {
-    max-height: 65vh;
+    max-height: 55vh;
   }
 }
-
-
