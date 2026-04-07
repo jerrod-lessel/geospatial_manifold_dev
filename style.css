@@ -1,6 +1,6 @@
 /* ============================================================================
    style.css - Geospatial Manifold
-   VERSION: 2026-04-06.a
+   VERSION: 2026-04-06.b
 
    LAYOUT OVERVIEW:
    - Full viewport map (no sidebar)
@@ -55,6 +55,14 @@ html, body {
   font-family: var(--font-main);
   overflow: hidden;
   background-color: #0c1f2c;
+}
+
+body {
+  /* Flex column so banner + about panel stack naturally above the map,
+     and #container fills all remaining vertical space automatically.
+     This means the about panel opening/closing just works — no JS needed. */
+  display: flex;
+  flex-direction: column;
 }
 
 /* ============================================================================
@@ -155,8 +163,16 @@ html, body {
 #container {
   position: relative;
   width: 100%;
-  height: calc(100vh - var(--banner-height));
+  /* flex: 1 means "take up all remaining vertical space after the banner and about panel".
+     This is what makes the about panel toggle work — no height recalculation needed. */
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
+}
+
+/* When the about panel is visible, shrink the container to fit */
+#about-panel:not(.hidden) ~ #container {
+  height: calc(100vh - var(--banner-height) - var(--about-height, 130px));
 }
 
 #map {
