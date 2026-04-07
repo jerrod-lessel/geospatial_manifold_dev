@@ -1,0 +1,157 @@
+  <!-- =========================================================
+       GEOSPATIAL MANIFOLD
+       VERSION: 2026-02-28.a
+       ========================================================= -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- =========================================================
+       BASIC META + TAB TITLE
+       ========================================================= -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- What shows in the browser tab -->
+  <title>Geospatial Manifold</title>
+
+  <!-- =========================================================
+       FAVICON
+       - Your prod uses favicon.ico
+       - Keep this exactly as-is if that's what you have in your web root
+       ========================================================= -->
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
+
+  <!-- =========================================================
+       LEAFLET CORE (CSS + JS)
+       ========================================================= -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- =========================================================
+       LEAFLET-GEOMAN (OPTIONAL)
+       - Included because your prod file includes it.
+       - If you are NOT using drawing/editing tools right now, you can remove it.
+       ========================================================= -->
+  <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+  <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+
+  <!-- =========================================================
+       ESRI LEAFLET (REQUIRED for MapServer/FeatureServer layers)
+       ========================================================= -->
+  <script src="https://unpkg.com/esri-leaflet/dist/esri-leaflet.js"></script>
+
+  <!-- =========================================================
+       TURF.JS (REQUIRED for nearest-edge distance logic)
+       ========================================================= -->
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+  <!-- =========================================================
+       GEORASTER + GEORASTER LAYER (OPTIONAL)
+       - Included because your prod file includes it.
+       - Only keep if you're using COG/GeoTIFF pixel querying or raster layers via GeoRaster.
+       ========================================================= -->
+  <script src="https://unpkg.com/georaster"></script>
+  <script src="https://unpkg.com/georaster-layer-for-leaflet"></script>
+
+  <!-- =========================================================
+       PROJ4 (OPTIONAL but you ARE calling proj4.defs(...) in map.js)
+       - Keep this if map.js uses proj4.
+       ========================================================= -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js"></script>
+
+  <!-- =========================================================
+       YOUR SITE CSS
+       ========================================================= -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <!-- =========================================================
+       TOP BANNER (MATCHES YOUR PROD STRUCTURE)
+       - IMPORTANT: logo.png is the file your prod HTML expects.
+         If your actual file is named differently, change src accordingly.
+       ========================================================= -->
+  <div id="top-banner">
+    <div id="left-banner">
+      <!-- Logo
+           If you don't want a logo (or the file isn't present),
+           you can delete this line and the layout will still work. -->
+      <img id="site-logo" src="logo.png" alt="Site Logo">
+
+      <!-- Titles
+           Note: using spans matches your prod structure and keeps title/subtitle stacked
+           as long as your CSS sets #titles to flex-direction: column. -->
+      <div id="titles">
+        <span id="main-title">Geospatial Manifold</span>
+        <span id="subtitle">Mapping risks, resources, and resilience across California</span>
+      </div>
+    </div>
+
+    <!-- About toggle
+         map.js attaches a click listener to #about-toggle -->
+    <button id="about-toggle" type="button">About</button>
+  </div>
+
+  <!-- =========================================================
+       ABOUT PANEL (COLLAPSIBLE)
+       - Hidden by default with .hidden
+       - map.js toggles it
+       ========================================================= -->
+  <div id="about-panel" class="hidden">
+    <h3>About Geospatial Manifold</h3>
+    <p>
+      Welcome to Geospatial Manifold! Your tool for exploring hazard, health, and resilience data across California.
+      This interactive map lets you see environmental conditions and community risks in your area or anywhere in the state.
+      Use the layers and controls to learn more and make informed decisions.
+    </p>
+    <p>
+      The data behind this map comes from trusted sources, including CAL FIRE, the California Office of Environmental Health Hazard Assessment (OEHHA),
+      the California Geological Survey, the U.S. Geological Survey (USGS), and FEMA.
+    </p>
+    <p>
+      Geospatial Manifold was created by Jerrod Lessel, a geospatial analyst at Caltrans who lives on California’s Central Coast.
+      This project aims to help Californians better understand the risks and strengths of their communities.
+    </p>
+  </div>
+
+  <!-- =========================================================
+       MAIN CONTAINER
+       - Sidebar (left) + Map (right)
+       - NOTE: We keep the spinner INSIDE the sidebar because your prod does.
+         map.js showSpinner()/hideSpinner() expects #loading-spinner to exist.
+       ========================================================= -->
+  <div id="container">
+
+    <!-- =========================
+         SIDEBAR
+         ========================= -->
+    <div id="sidebar">
+
+      <!-- Loading spinner overlay (inside sidebar) -->
+      <div id="loading-spinner" class="hidden">
+        <div class="spinner"></div>
+      </div>
+
+      <h2>Location Report</h2>
+
+      <!-- Report output area -->
+      <div id="report-content">
+        <em>Click on the map to load data.</em>
+      </div>
+    </div>
+
+    <!-- =========================
+         MAP DIV (Leaflet attaches here)
+         ========================= -->
+    <div id="map"></div>
+
+  </div> <!-- end #container -->
+
+  <!-- =========================================================
+       MAIN APP JS
+       - Loaded at the end so the DOM exists when map.js runs
+       ========================================================= -->
+  <script src="map.js"></script>
+</body>
+</html>
