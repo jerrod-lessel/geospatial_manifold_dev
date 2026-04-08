@@ -901,7 +901,7 @@ function addLegendControls(map) {
 
       <div class="legend-section">
         <strong>Active Fires (WFIGS / NIFC)</strong>
-        <div style="display:flex;align-items:center;gap:10px;margin-top:6px;"><span style="font-size:16px;">🔥</span><span>        Small incident</span></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:6px;"><span style="font-size:16px;">🔥</span><span>Small incident</span></div>
         <div style="display:flex;align-items:center;gap:10px;margin-top:6px;"><span style="font-size:26px;">🔥</span><span>Large incident</span></div>
       </div>
 
