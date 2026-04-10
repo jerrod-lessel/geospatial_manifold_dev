@@ -80,7 +80,8 @@ const UI = {
 };
 
 const NREL = {
-  API_KEY: "FB9tVCYIfh5V0h7TXeAnci6F5ee6QKX9AA1Rlq0P",
+  // API key has been moved to a Cloudflare Worker (nrel-proxy) — never put it here again!
+  WORKER_URL: "https://round-dust-6f7a.jerrod-lessel.workers.dev",
   ATTRIBUTION: '<a href="https://afdc.energy.gov/stations/">NREL/AFDC</a>',
 };
 
@@ -614,7 +615,8 @@ function createEvChargersLayer(map) {
     const centerLat = (sw.lat + ne.lat) / 2;
     const centerLng = (sw.lng + ne.lng) / 2;
 
-    const url = `https://developer.nlr.gov/api/alt-fuel-stations/v1/nearest.json?api_key=${NREL.API_KEY}&fuel_type=ELEC&latitude=${centerLat}&longitude=${centerLng}&radius=100&status=E&access=public&state=CA&limit=200`;
+    // Route through Cloudflare Worker — key is stored securely there, never in this file
+    const url = `${NREL.WORKER_URL}?fuel_type=ELEC&latitude=${centerLat}&longitude=${centerLng}&radius=100&status=E&access=public&state=CA&limit=200`;
 
     fetch(url)
       .then((r) => r.json())
@@ -843,10 +845,10 @@ function addLegendControls(map) {
 
       <div class="legend-section">
         <strong>Flood Hazard Zones (FEMA)</strong>
-        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#feb24c;"></span><em> 0.2% Annual Chance Flood Hazard</em></div>
-        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#f03b20;"></span><em> 1% Annual Chance Flood Hazard</em></div>
-        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#769ccd;"></span><em> Regulatory Floodway</em></div>
-        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#e5d099;"></span><em> Reduced Risk Due to Levee</em></div>
+        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#feb24c;"></span><em>0.2% Annual Chance Flood Hazard</em></div>
+        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#f03b20;"></span><em>1% Annual Chance Flood Hazard</em></div>
+        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#769ccd;"></span><em>Regulatory Floodway</em></div>
+        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#e5d099;"></span><em>Reduced Risk Due to Levee</em></div>
       </div>
 
       <div class="legend-section">
@@ -1105,7 +1107,7 @@ const PanelController = (function () {
         <span class="haz-badge haz-badge-gray">Outside mapped zones</span>
         <div class="dash-card-explain" style="margin-top:8px;">
           This location is not within a mapped Fire Hazard Severity Zone.
-          The nearest zone - <strong>${r.fire.nearestZone}</strong> - is approximately
+          The nearest zone — <strong>${r.fire.nearestZone}</strong> — is approximately
           <strong>${r.fire.nearestDist} mi</strong> away. Fire Hazard Severity Zones are mapped
           by CAL FIRE and cover the State Responsibility Area (SRA) and Local Responsibility Area (LRA).
           Areas outside these zones may still face fire risk, but are not subject to the same mandatory
@@ -1127,7 +1129,7 @@ const PanelController = (function () {
         <div class="dash-card-explain">
           This location is within <strong>${r.flood.zone}</strong> according to FEMA's National Flood
           Hazard Layer (NFHL). The 1% Annual Chance Flood Hazard (also called the "100-year floodplain")
-          means there is a 1% chance of flooding in any given year - and a 26% chance over a 30-year
+          means there is a 1% chance of flooding in any given year — and a 26% chance over a 30-year
           mortgage. The 0.2% zone represents lower probability but still meaningful risk. Floodway
           designations indicate the active channel where even minor development can increase flood risk
           upstream and downstream. These zones are used to determine federal flood insurance requirements.
@@ -1138,7 +1140,7 @@ const PanelController = (function () {
         <span class="haz-badge haz-badge-gray">Outside mapped flood zones</span>
         <div class="dash-card-explain" style="margin-top:8px;">
           This location does not fall within a mapped FEMA flood hazard zone.
-          The nearest zone - <strong>${r.flood.nearestZone}</strong> - is approximately
+          The nearest zone — <strong>${r.flood.nearestZone}</strong> — is approximately
           <strong>${r.flood.nearestDist} mi</strong> away.
           Properties outside mapped flood zones are generally considered lower risk but can still
           experience flooding from unmapped or localized drainage events.
@@ -1163,10 +1165,10 @@ const PanelController = (function () {
         <div class="dash-card-explain">
           The nearest mapped fault is the <strong>${r.fault.name}</strong>, approximately
           <strong>${r.fault.dist.toFixed(2)} miles</strong> from this location. This distance is measured
-          to the closest point on the mapped fault trace - the actual rupture zone may be wider.
+          to the closest point on the mapped fault trace — the actual rupture zone may be wider.
           Proximity to a fault is one of the most significant factors in seismic risk. Quaternary faults
           (those active within the last ~2.6 million years) are considered most likely to produce future
-          earthquakes. Distance alone doesn't capture everything - fault type, local geology, and soil
+          earthquakes. Distance alone doesn't capture everything — fault type, local geology, and soil
           conditions all affect shaking intensity at any given point.
         </div>
       `);
@@ -1207,7 +1209,7 @@ const PanelController = (function () {
         </div>
       `).join("");
 
-      body.insertAdjacentHTML("beforeend", _card("calenviroscreen 4.0 - statewide percentiles", `
+      body.insertAdjacentHTML("beforeend", _card("calenviroscreen 4.0 — statewide percentiles", `
         <div class="dash-card-sub">
           Percentiles compare this census tract to all others statewide.
           Higher = greater environmental burden relative to other Californians.
@@ -1236,13 +1238,13 @@ const PanelController = (function () {
       }
 
       if (r.air.pm !== null) {
-        body.insertAdjacentHTML("beforeend", _card("pm2.5 - fine particulate matter", `
+        body.insertAdjacentHTML("beforeend", _card("pm2.5 — fine particulate matter", `
           <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px;">
             <span class="dash-card-value">${r.air.pm}th</span>
             <span class="dash-card-sub" style="margin:0;">percentile${r.air.pmRaw !== null ? " · " + r.air.pmRaw.toFixed(2) + " µg/m³" : ""}</span>
           </div>
           <div class="dash-card-explain">
-            PM2.5 refers to fine particles smaller than 2.5 micrometers - about 30 times smaller than
+            PM2.5 refers to fine particles smaller than 2.5 micrometers — about 30 times smaller than
             a human hair. They are produced by combustion (cars, wildfires, industrial sources) and can
             penetrate deep into the lungs and bloodstream. Long-term exposure is linked to cardiovascular
             and respiratory disease, premature death, and developmental issues in children. This indicator
@@ -1289,7 +1291,7 @@ const PanelController = (function () {
         `<div class="mmi-box ${v <= mmiInt ? "" : "inactive"}" style="background:${_mmiColor(v)}"></div>`
       ).join("");
 
-      body.insertAdjacentHTML("beforeend", _card("shaking potential - mmi (10% in 50 years)", `
+      body.insertAdjacentHTML("beforeend", _card("shaking potential — mmi (10% in 50 years)", `
         <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px;">
           <span class="dash-card-value">${fmt.valueStr}</span>
           <span class="dash-card-sub" style="margin:0;">${fmt.label}</span>
@@ -1298,7 +1300,7 @@ const PanelController = (function () {
         <div class="mmi-scale-labels"><span>MMI 4 · Light</span><span>MMI 10 · Extreme</span></div>
         <div class="dash-card-explain">
           The Modified Mercalli Intensity (MMI) scale describes how strongly the ground shakes at a
-          specific location during an earthquake, based on estimated ground motion from historical
+          specific location during an earthquake — based on estimated ground motion from historical
           seismic data. An MMI of <strong>${fmt.valueStr} (${fmt.label})</strong> at this location is
           the estimated intensity with a 10% probability of being exceeded over 50 years, meaning there
           is roughly a 1-in-10 chance shaking this strong or stronger will occur here within a 50-year
@@ -1329,7 +1331,7 @@ const PanelController = (function () {
         <div class="dash-card-explain">
           This location falls within Landslide Susceptibility <strong>Class ${r.geo.landslide}</strong>
           according to CGS Map Sheet 58. The classification reflects the relative likelihood of slope
-          failure based on geology, terrain steepness, and historical patterns, not an absolute
+          failure based on geology, terrain steepness, and historical patterns — not an absolute
           probability. Higher classes (VII–X) indicate terrain that is more prone to landslides,
           debris flows, and earth movements under triggers like intense rainfall, prolonged saturation,
           or strong earthquake shaking. This data is most relevant for land use planning, grading
@@ -1349,8 +1351,8 @@ const PanelController = (function () {
     if (btn) { btn.disabled = true; btn.textContent = "Generating PDF…"; }
 
     // Build a self-contained printable div
-    const lat  = _lastLatLng ? _lastLatLng.lat.toFixed(5) : "-";
-    const lng  = _lastLatLng ? Math.abs(_lastLatLng.lng).toFixed(5) : "-";
+    const lat  = _lastLatLng ? _lastLatLng.lat.toFixed(5) : "—";
+    const lng  = _lastLatLng ? Math.abs(_lastLatLng.lng).toFixed(5) : "—";
     const name = $("panel-location-name")?.textContent || "Location Report";
     const date = new Date().toLocaleString();
 
@@ -1358,7 +1360,7 @@ const PanelController = (function () {
     printEl.style.cssText = "font-family:Arial,sans-serif;color:#111;background:#fff;padding:24px;max-width:680px;";
 
     printEl.innerHTML = `
-      <h1 style="margin:0 0 4px;font-size:18px;color:#0c1f2c;">Geospatial Manifold - Location Report</h1>
+      <h1 style="margin:0 0 4px;font-size:18px;color:#0c1f2c;">Geospatial Manifold — Location Report</h1>
       <p style="margin:0 0 2px;font-size:12px;color:#555;">${name}</p>
       <p style="margin:0 0 16px;font-size:11px;color:#888;">Coordinates: ${lat}° N, ${lng}° W · Generated: ${date}</p>
       <hr style="border:none;border-top:1px solid #ddd;margin-bottom:16px;">
@@ -1451,7 +1453,7 @@ function installClickReport(map, layers) {
     const lat = e.latlng.lat;
     const lng = e.latlng.lng;
 
-    // Result buckets - structured objects now, not HTML strings
+    // Result buckets — structured objects now, not HTML strings
     const results = {
       fire:  { zone: null, area: null, nearestZone: null, nearestDist: null },
       flood: { zone: null, nearestZone: null, nearestDist: null },
