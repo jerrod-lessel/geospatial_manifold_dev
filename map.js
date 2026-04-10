@@ -742,15 +742,11 @@ function queryFaultLayerNearby(faultFeatureLayer, latlng, meters) {
     const ne = L.latLng(latlng.lat + degOffset, latlng.lng + degOffset);
     const bounds = L.latLngBounds(sw, ne);
 
-    console.log("[Faults] Querying bounds:", bounds.toBBoxString(), "| url:", faultFeatureLayer.options?.url);
-
     faultFeatureLayer
       .query()
       .within(bounds)
       .returnGeometry(true)
       .run((err, fc) => {
-        if (err) console.warn("[Faults] Query error:", err);
-        else console.log("[Faults] Features returned:", fc?.features?.length ?? 0, fc?.features?.[0]?.properties);
         resolve({ err, fc });
       });
   });
