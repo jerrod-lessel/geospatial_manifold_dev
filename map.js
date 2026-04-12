@@ -1,6 +1,6 @@
 /* ============================================================================
   map.js - Geospatial Manifold (Leaflet + Esri Leaflet)
-  VERSION: 2026-04-06.a
+  VERSION: 2026-04-11.a
 
   WHAT THIS FILE DOES:
   - Initializes the map + basemap options
@@ -742,11 +742,15 @@ function queryFaultLayerNearby(faultFeatureLayer, latlng, meters) {
     const ne = L.latLng(latlng.lat + degOffset, latlng.lng + degOffset);
     const bounds = L.latLngBounds(sw, ne);
 
+    console.log("[Faults] Querying bounds:", bounds.toBBoxString(), "| url:", faultFeatureLayer.options?.url);
+
     faultFeatureLayer
       .query()
       .within(bounds)
       .returnGeometry(true)
       .run((err, fc) => {
+        if (err) console.warn("[Faults] Query error:", err);
+        else console.log("[Faults] Features returned:", fc?.features?.length ?? 0, fc?.features?.[0]?.properties);
         resolve({ err, fc });
       });
   });
@@ -1174,21 +1178,57 @@ const PanelController = (function () {
     body.insertAdjacentHTML("beforeend", faultHTML);
   }
 
-  // ---- AIR QUALITY TAB ----
+  // ---- ENVIRONMENT & HEALTH TAB ----
 
   function _renderAir(body, r) {
 
-    // -- Percentile bars (all three) --
-    const hasAny = r.air.ozone !== null || r.air.pm !== null || r.air.water !== null;
+    const hasAny = r.air.ozone !== null || r.air.pm !== null || r.air.water !== null ||
+                   r.air.diesel !== null || r.air.pesticide !== null ||
+                   r.air.lead !== null || r.air.asthma !== null || r.air.cesScore !== null;
 
-    if (hasAny) {
-      const rows = [
-        { name: "Ozone",          val: r.air.ozone, raw: r.air.ozoneRaw,  unit: "ppm",    field: "ozoneP" },
-        { name: "PM2.5",          val: r.air.pm,    raw: r.air.pmRaw,     unit: "µg/m³",  field: "pmP"    },
-        { name: "Drinking Water", val: r.air.water, raw: r.air.waterRaw,  unit: "",       field: "drinkP" },
-      ].filter((row) => row.val !== null);
+    if (!hasAny) {
+      body.insertAdjacentHTML("beforeend", _noData("No CalEnviroScreen data found for this location. This area may not be within a mapped California census tract."));
+      return;
+    }
 
-      const barsHTML = rows.map((row) => `
+    // -- Overall CES Score (shown first, prominently) --
+    if (r.air.cesScore !== null) {
+      const scoreColor = _pctBarColor(r.air.cesScore);
+      body.insertAdjacentHTML("beforeend", _card("overall calenviroscreen 4.0 score", `
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px;">
+          <span class="dash-card-value">${r.air.cesScore}th</span>
+          <span class="dash-card-sub" style="margin:0;">percentile statewide</span>
+        </div>
+        <div class="severity-track">
+          <div class="severity-fill" style="width:${r.air.cesScore}%;background:${scoreColor}"></div>
+        </div>
+        <div class="severity-labels"><span>0th (lowest burden)</span><span>100th (highest)</span></div>
+        <div class="dash-card-explain">
+          The overall CalEnviroScreen score combines all pollution burden and population vulnerability
+          indicators into a single percentile for this census tract. A score of
+          <strong>${r.air.cesScore}th percentile</strong> means this tract has a higher cumulative
+          environmental burden than <strong>${r.air.cesScore}%</strong> of all California census tracts.
+          This score is used by CalEPA to identify disadvantaged communities for targeted investment
+          and environmental justice programs. It is a relative comparison tool — a high score does not
+          mean a location is unsafe, but rather that it experiences more cumulative pollution burden
+          than most other communities in the state.
+        </div>
+      `));
+    }
+
+    // -- Summary bar chart (all available indicators) --
+    const summaryRows = [
+      { name: "Ozone",       val: r.air.ozone },
+      { name: "PM2.5",       val: r.air.pm },
+      { name: "Diesel PM",   val: r.air.diesel },
+      { name: "Pesticides",  val: r.air.pesticide },
+      { name: "Water",       val: r.air.water },
+      { name: "Lead Risk",   val: r.air.lead },
+      { name: "Asthma",      val: r.air.asthma },
+    ].filter((row) => row.val !== null);
+
+    if (summaryRows.length > 0) {
+      const barsHTML = summaryRows.map((row) => `
         <div class="pct-row">
           <div class="pct-name">${row.name}</div>
           <div class="pct-track">
@@ -1198,80 +1238,150 @@ const PanelController = (function () {
         </div>
       `).join("");
 
-      const statCells = rows.map((row) => `
-        <div class="stat-cell">
-          <div class="stat-cell-val">${row.val}th</div>
-          <div class="stat-cell-label">${row.name}</div>
-        </div>
-      `).join("");
-
-      body.insertAdjacentHTML("beforeend", _card("calenviroscreen 4.0 — statewide percentiles", `
-        <div class="dash-card-sub">
-          Percentiles compare this census tract to all others statewide.
-          Higher = greater environmental burden relative to other Californians.
+      body.insertAdjacentHTML("beforeend", _card("indicator summary — statewide percentiles", `
+        <div class="dash-card-sub" style="margin-bottom:10px;">
+          Each bar shows how this census tract compares to all others statewide.
+          Higher percentile = greater burden relative to other Californians.
         </div>
         ${barsHTML}
-        <div class="stat-row" style="margin-top:6px;">${statCells}</div>
       `));
+    }
 
-      // -- Individual explanations --
-      if (r.air.ozone !== null) {
-        body.insertAdjacentHTML("beforeend", _card("ozone (ground-level)", `
-          <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px;">
-            <span class="dash-card-value">${r.air.ozone}th</span>
-            <span class="dash-card-sub" style="margin:0;">percentile${r.air.ozoneRaw !== null ? " · " + r.air.ozoneRaw.toFixed(3) + " ppm" : ""}</span>
-          </div>
-          <div class="dash-card-explain">
-            Ground-level ozone forms when sunlight reacts with pollutants from cars, power plants, and
-            industrial sources. Unlike the protective ozone layer high in the atmosphere, ground-level
-            ozone irritates the airways, aggravates asthma and respiratory disease, and can reduce lung
-            function even in healthy people. This CalEnviroScreen indicator summarizes warm-season
-            (May–October) ozone conditions based on monitoring data from 2017–2019. A percentile of
-            <strong>${r.air.ozone}</strong> means this tract has higher ozone exposure than
-            <strong>${r.air.ozone}%</strong> of California census tracts.
-          </div>
-        `));
-      }
+    // -- Individual indicator cards --
 
-      if (r.air.pm !== null) {
-        body.insertAdjacentHTML("beforeend", _card("pm2.5 — fine particulate matter", `
-          <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px;">
-            <span class="dash-card-value">${r.air.pm}th</span>
-            <span class="dash-card-sub" style="margin:0;">percentile${r.air.pmRaw !== null ? " · " + r.air.pmRaw.toFixed(2) + " µg/m³" : ""}</span>
-          </div>
-          <div class="dash-card-explain">
-            PM2.5 refers to fine particles smaller than 2.5 micrometers — about 30 times smaller than
-            a human hair. They are produced by combustion (cars, wildfires, industrial sources) and can
-            penetrate deep into the lungs and bloodstream. Long-term exposure is linked to cardiovascular
-            and respiratory disease, premature death, and developmental issues in children. This indicator
-            is based on annual average concentrations from 2015–2017. A percentile of
-            <strong>${r.air.pm}</strong> means this tract has higher PM2.5 than
-            <strong>${r.air.pm}%</strong> of California census tracts.
-          </div>
-        `));
-      }
+    if (r.air.ozone !== null) {
+      body.insertAdjacentHTML("beforeend", _card("ozone (ground-level)", `
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px;">
+          <span class="dash-card-value">${r.air.ozone}th</span>
+          <span class="dash-card-sub" style="margin:0;">percentile${r.air.ozoneRaw !== null ? " · " + r.air.ozoneRaw.toFixed(3) + " ppm" : ""}</span>
+        </div>
+        <div class="dash-card-explain">
+          Ground-level ozone forms when sunlight reacts with pollutants from cars, power plants, and
+          industrial sources. Unlike the protective ozone layer high in the atmosphere, ground-level
+          ozone irritates the airways, aggravates asthma and respiratory disease, and can reduce lung
+          function even in healthy people. This indicator summarizes warm-season (May–October) ozone
+          conditions from 2017–2019. A percentile of <strong>${r.air.ozone}</strong> means this tract
+          has higher ozone exposure than <strong>${r.air.ozone}%</strong> of California census tracts.
+        </div>
+      `));
+    }
 
-      if (r.air.water !== null) {
-        body.insertAdjacentHTML("beforeend", _card("drinking water contaminants", `
-          <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px;">
-            <span class="dash-card-value">${r.air.water}th</span>
-            <span class="dash-card-sub" style="margin:0;">percentile${r.air.waterRaw !== null ? " · raw score: " + r.air.waterRaw.toFixed(2) : ""}</span>
-          </div>
-          <div class="dash-card-explain">
-            This indicator combines contaminant levels and regulatory violations from drinking water
-            systems serving this area, based on data from 2011–2019 compliance cycles. Contaminants
-            tracked include nitrates, arsenic, hexavalent chromium, and other regulated substances.
-            A higher score generally indicates a water system with more contaminant detections or more
-            frequent violations. This is particularly relevant in rural areas and disadvantaged
-            communities where aging infrastructure or agricultural runoff may affect water quality.
-            A percentile of <strong>${r.air.water}</strong> means this tract has a higher drinking water
-            burden than <strong>${r.air.water}%</strong> of California census tracts.
-          </div>
-        `));
-      }
+    if (r.air.pm !== null) {
+      body.insertAdjacentHTML("beforeend", _card("pm2.5 — fine particulate matter", `
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px;">
+          <span class="dash-card-value">${r.air.pm}th</span>
+          <span class="dash-card-sub" style="margin:0;">percentile${r.air.pmRaw !== null ? " · " + r.air.pmRaw.toFixed(2) + " µg/m³" : ""}</span>
+        </div>
+        <div class="dash-card-explain">
+          PM2.5 refers to fine particles smaller than 2.5 micrometers — about 30 times smaller than
+          a human hair. They come from combustion sources like cars, trucks, wildfires, and industry,
+          and can penetrate deep into the lungs and bloodstream. Long-term exposure is linked to
+          cardiovascular and respiratory disease, premature death, and developmental issues in children.
+          This indicator uses annual average concentrations from 2015–2017. A percentile of
+          <strong>${r.air.pm}</strong> means this tract has higher PM2.5 than
+          <strong>${r.air.pm}%</strong> of California census tracts.
+        </div>
+      `));
+    }
 
-    } else {
-      body.insertAdjacentHTML("beforeend", _noData("No CalEnviroScreen data found for this location. This area may not be within a mapped California census tract."));
+    if (r.air.diesel !== null) {
+      body.insertAdjacentHTML("beforeend", _card("diesel particulate matter (diesel pm)", `
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px;">
+          <span class="dash-card-value">${r.air.diesel}th</span>
+          <span class="dash-card-sub" style="margin:0;">percentile${r.air.dieselRaw !== null ? " · " + r.air.dieselRaw.toFixed(2) + " µg/m³" : ""}</span>
+        </div>
+        <div class="dash-card-explain">
+          Diesel PM measures emissions from diesel-powered vehicles and equipment — primarily trucks,
+          buses, trains, construction equipment, and ships. Diesel exhaust contains a complex mixture
+          of gases and fine particles that are classified as a known carcinogen by the State of California.
+          Communities near freeways, ports, rail yards, and distribution centers tend to have higher
+          diesel PM exposure. This indicator reflects modeled emissions estimates and is particularly
+          relevant in the Central Valley and near major freight corridors. A percentile of
+          <strong>${r.air.diesel}</strong> means this tract has higher diesel PM exposure than
+          <strong>${r.air.diesel}%</strong> of California census tracts.
+        </div>
+      `));
+    }
+
+    if (r.air.pesticide !== null) {
+      body.insertAdjacentHTML("beforeend", _card("pesticide use", `
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px;">
+          <span class="dash-card-value">${r.air.pesticide}th</span>
+          <span class="dash-card-sub" style="margin:0;">percentile${r.air.pesticideRaw !== null ? " · " + r.air.pesticideRaw.toFixed(1) + " lbs/sq mi" : ""}</span>
+        </div>
+        <div class="dash-card-explain">
+          This indicator measures total pounds of selected agricultural pesticide active ingredients
+          applied per square mile in the census tract, based on California Department of Pesticide
+          Regulation (DPR) data. A high percentile reflects heavy nearby agricultural pesticide use —
+          it does not mean residents are being directly exposed or are in immediate danger. The primary
+          concern is for people with regular or occupational exposure, particularly farmworkers and
+          those living immediately adjacent to treated fields. Research has found associations between
+          chronic high-level pesticide exposure and certain health outcomes including neurological
+          effects and some cancers, though risk depends heavily on the specific chemicals, exposure
+          duration, and individual factors. A percentile of <strong>${r.air.pesticide}</strong> means
+          this tract has higher reported pesticide use than <strong>${r.air.pesticide}%</strong> of
+          California census tracts.
+        </div>
+      `));
+    }
+
+    if (r.air.water !== null) {
+      body.insertAdjacentHTML("beforeend", _card("drinking water contaminants", `
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px;">
+          <span class="dash-card-value">${r.air.water}th</span>
+          <span class="dash-card-sub" style="margin:0;">percentile${r.air.waterRaw !== null ? " · raw score: " + r.air.waterRaw.toFixed(2) : ""}</span>
+        </div>
+        <div class="dash-card-explain">
+          This indicator combines contaminant levels and regulatory violations from drinking water
+          systems serving this area, based on data from 2011–2019 compliance cycles. Contaminants
+          tracked include nitrates, arsenic, hexavalent chromium, and other regulated substances.
+          A higher score indicates a water system with more contaminant detections or more frequent
+          violations. This is particularly relevant in rural areas and disadvantaged communities
+          where aging infrastructure or agricultural runoff may affect water quality. A percentile of
+          <strong>${r.air.water}</strong> means this tract has a higher drinking water burden than
+          <strong>${r.air.water}%</strong> of California census tracts.
+        </div>
+      `));
+    }
+
+    if (r.air.lead !== null) {
+      body.insertAdjacentHTML("beforeend", _card("children's lead risk from housing", `
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px;">
+          <span class="dash-card-value">${r.air.lead}th</span>
+          <span class="dash-card-sub" style="margin:0;">percentile${r.air.leadRaw !== null ? " · score: " + r.air.leadRaw.toFixed(2) : ""}</span>
+        </div>
+        <div class="dash-card-explain">
+          This indicator — new in CalEnviroScreen 4.0 — estimates the risk of lead exposure for
+          children from housing, based on the age of homes and the prevalence of low-income households
+          with children under 6. Older homes (built before 1978) are more likely to contain lead-based
+          paint, which is the leading source of lead poisoning in children. Low-income households are
+          less likely to have undergone renovations or lead abatement. There is no safe level of lead
+          exposure for children — even low levels can affect brain development, learning, and behavior.
+          This is a risk indicator based on housing characteristics, not a measurement of actual
+          blood lead levels. A percentile of <strong>${r.air.lead}</strong> means children in this
+          tract face higher estimated lead exposure risk than those in
+          <strong>${r.air.lead}%</strong> of California census tracts.
+        </div>
+      `));
+    }
+
+    if (r.air.asthma !== null) {
+      body.insertAdjacentHTML("beforeend", _card("asthma emergency department visits", `
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px;">
+          <span class="dash-card-value">${r.air.asthma}th</span>
+          <span class="dash-card-sub" style="margin:0;">percentile${r.air.asthmaRaw !== null ? " · " + r.air.asthmaRaw.toFixed(1) + " visits/10k" : ""}</span>
+        </div>
+        <div class="dash-card-explain">
+          This indicator measures age-adjusted rates of emergency department visits for asthma
+          per 10,000 residents, based on patient ZIP code data. Unlike the air quality indicators
+          above which measure pollutant levels, this is a direct health outcome measure — it shows
+          where people are actually going to the ER for breathing emergencies. High asthma ED rates
+          are strongly associated with elevated air pollution, but also reflect factors like access
+          to preventive healthcare, housing quality, and socioeconomic conditions. A percentile of
+          <strong>${r.air.asthma}</strong> means this tract has higher asthma ED visit rates than
+          <strong>${r.air.asthma}%</strong> of California census tracts.
+        </div>
+      `));
     }
   }
 
@@ -1454,12 +1564,21 @@ function installClickReport(map, layers) {
       fire:  { zone: null, area: null, nearestZone: null, nearestDist: null },
       flood: { zone: null, nearestZone: null, nearestDist: null },
       fault: { name: null, dist: null },
-      air:   { ozone: null, ozoneRaw: null, pm: null, pmRaw: null, water: null, waterRaw: null },
+      air:   {
+        ozone: null, ozoneRaw: null,
+        pm: null, pmRaw: null,
+        water: null, waterRaw: null,
+        diesel: null, dieselRaw: null,
+        pesticide: null, pesticideRaw: null,
+        lead: null, leadRaw: null,
+        asthma: null, asthmaRaw: null,
+        cesScore: null,
+      },
       geo:   { mmi: null, landslide: null },
     };
 
     let completed  = 0;
-    const total    = 7; // number of async tasks below
+    const total    = 12; // number of async tasks below
 
     function checkDone() {
       completed++;
@@ -1591,6 +1710,65 @@ function installClickReport(map, layers) {
       finally { checkDone(); }
     });
 
+    // ---- Task 8: Diesel PM ----
+    layers.dieselLayer.query().contains(e.latlng).run((err, fc) => {
+      try {
+        if (!err && fc.features.length > 0) {
+          const p = fc.features[0].properties;
+          results.air.diesel    = p.dieselP !== undefined ? Math.round(p.dieselP) : null;
+          results.air.dieselRaw = p.diesel ?? null;
+        }
+      } catch (ex) { console.warn("Diesel PM query error:", ex); }
+      finally { checkDone(); }
+    });
+
+    // ---- Task 9: Pesticides ----
+    layers.pesticideLayer.query().contains(e.latlng).run((err, fc) => {
+      try {
+        if (!err && fc.features.length > 0) {
+          const p = fc.features[0].properties;
+          results.air.pesticide    = p.pesticideP !== undefined ? Math.round(p.pesticideP) : null;
+          results.air.pesticideRaw = p.pesticide ?? null;
+        }
+      } catch (ex) { console.warn("Pesticide query error:", ex); }
+      finally { checkDone(); }
+    });
+
+    // ---- Task 10: Children's Lead Risk ----
+    layers.leadLayer.query().contains(e.latlng).run((err, fc) => {
+      try {
+        if (!err && fc.features.length > 0) {
+          const p = fc.features[0].properties;
+          results.air.lead    = p.leadP !== undefined ? Math.round(p.leadP) : null;
+          results.air.leadRaw = p.lead ?? null;
+        }
+      } catch (ex) { console.warn("Lead risk query error:", ex); }
+      finally { checkDone(); }
+    });
+
+    // ---- Task 11: Asthma ----
+    layers.asthmaLayer.query().contains(e.latlng).run((err, fc) => {
+      try {
+        if (!err && fc.features.length > 0) {
+          const p = fc.features[0].properties;
+          results.air.asthma    = p.asthmaP !== undefined ? Math.round(p.asthmaP) : null;
+          results.air.asthmaRaw = p.asthma ?? null;
+        }
+      } catch (ex) { console.warn("Asthma query error:", ex); }
+      finally { checkDone(); }
+    });
+
+    // ---- Task 12: Overall CES Score ----
+    layers.cesScoreLayer.query().contains(e.latlng).run((err, fc) => {
+      try {
+        if (!err && fc.features.length > 0) {
+          const p = fc.features[0].properties;
+          results.air.cesScore = p.CIscoreP !== undefined ? Math.round(p.CIscoreP) : null;
+        }
+      } catch (ex) { console.warn("CES score query error:", ex); }
+      finally { checkDone(); }
+    });
+
     // ---- Task 7: Landslide + MMI (combined since both are identify calls) ----
     (async () => {
       try {
@@ -1637,9 +1815,14 @@ function installClickReport(map, layers) {
     fireHazardLRA:    fire.fireHazardLRA,
     fireHazardLayer:  fire.fireHazardLayer,
     activeFires:      createActiveFiresLayer(),
-    ozoneLayer:       createCesLayer("ozoneP IS NOT NULL", "ozoneP"),
-    pmLayer:          createCesLayer("pmP IS NOT NULL",    "pmP"),
-    drinkLayer:       createCesLayer("drinkP IS NOT NULL", "drinkP"),
+    ozoneLayer:       createCesLayer("ozoneP IS NOT NULL",      "ozoneP"),
+    pmLayer:          createCesLayer("pmP IS NOT NULL",          "pmP"),
+    drinkLayer:       createCesLayer("drinkP IS NOT NULL",       "drinkP"),
+    dieselLayer:      createCesLayer("dieselP IS NOT NULL",      "dieselP"),
+    pesticideLayer:   createCesLayer("pesticideP IS NOT NULL",   "pesticideP"),
+    leadLayer:        createCesLayer("leadP IS NOT NULL",        "leadP"),
+    asthmaLayer:      createCesLayer("asthmaP IS NOT NULL",      "asthmaP"),
+    cesScoreLayer:    createCesLayer("CIscoreP IS NOT NULL",     "CIscoreP"),
     highwayLayer:     createHighwayLayer(),
     allRoadsLayer:    createAllRoadsLayer(),
     schoolsLayer:     makeZoomGatedLayer(map, createSchoolsLayer(),       UI.ZOOM_POI_MIN),
@@ -1700,6 +1883,11 @@ function installClickReport(map, layers) {
     "Ozone Percentiles":          LAYERS.ozoneLayer,
     "PM2.5 Concentration":        LAYERS.pmLayer,
     "Water Quality":              LAYERS.drinkLayer,
+    "Diesel PM":                  LAYERS.dieselLayer,
+    "Pesticide Use":              LAYERS.pesticideLayer,
+    "Children's Lead Risk":       LAYERS.leadLayer,
+    "Asthma Rates":               LAYERS.asthmaLayer,
+    "CES Overall Score":          LAYERS.cesScoreLayer,
   };
 
   L.control.layers(
@@ -1720,13 +1908,18 @@ function installClickReport(map, layers) {
 
   // 9) Click reporting (feeds slide panel)
   installClickReport(map, {
-    fireHazardSRA: LAYERS.fireHazardSRA,
-    fireHazardLRA: LAYERS.fireHazardLRA,
-    floodLayer:    LAYERS.floodLayer,
-    ozoneLayer:    LAYERS.ozoneLayer,
-    pmLayer:       LAYERS.pmLayer,
-    drinkLayer:    LAYERS.drinkLayer,
-    faultsLayer:   LAYERS.faultsLayer,
+    fireHazardSRA:  LAYERS.fireHazardSRA,
+    fireHazardLRA:  LAYERS.fireHazardLRA,
+    floodLayer:     LAYERS.floodLayer,
+    ozoneLayer:     LAYERS.ozoneLayer,
+    pmLayer:        LAYERS.pmLayer,
+    drinkLayer:     LAYERS.drinkLayer,
+    dieselLayer:    LAYERS.dieselLayer,
+    pesticideLayer: LAYERS.pesticideLayer,
+    leadLayer:      LAYERS.leadLayer,
+    asthmaLayer:    LAYERS.asthmaLayer,
+    cesScoreLayer:  LAYERS.cesScoreLayer,
+    faultsLayer:    LAYERS.faultsLayer,
   });
 
   // 10) Initial road sync
