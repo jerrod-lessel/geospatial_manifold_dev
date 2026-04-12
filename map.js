@@ -1727,8 +1727,8 @@ function installClickReport(map, layers) {
       try {
         if (!err && fc.features.length > 0) {
           const p = fc.features[0].properties;
-          results.air.pesticide    = p.pesticideP !== undefined ? Math.round(p.pesticideP) : null;
-          results.air.pesticideRaw = p.pesticide ?? null;
+          results.air.pesticide    = p.pestP !== undefined ? Math.round(p.pestP) : null;
+          results.air.pesticideRaw = p.pest ?? null;
         }
       } catch (ex) { console.warn("Pesticide query error:", ex); }
       finally { checkDone(); }
@@ -1819,7 +1819,7 @@ function installClickReport(map, layers) {
     pmLayer:          createCesLayer("pmP IS NOT NULL",          "pmP"),
     drinkLayer:       createCesLayer("drinkP IS NOT NULL",       "drinkP"),
     dieselLayer:      createCesLayer("dieselP IS NOT NULL",      "dieselP"),
-    pesticideLayer:   createCesLayer("pesticideP IS NOT NULL",   "pesticideP"),
+    pesticideLayer:   createCesLayer("pestP IS NOT NULL",      "pestP"),
     leadLayer:        createCesLayer("leadP IS NOT NULL",        "leadP"),
     asthmaLayer:      createCesLayer("asthmaP IS NOT NULL",      "asthmaP"),
     cesScoreLayer:    createCesLayer("CIscoreP IS NOT NULL",     "CIscoreP"),
