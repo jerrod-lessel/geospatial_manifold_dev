@@ -1165,7 +1165,7 @@ const PanelController = (function () {
         <div class="dash-card-explain">
           The nearest mapped fault is the <strong>${r.fault.name}</strong>, approximately
           <strong>${r.fault.dist.toFixed(2)} miles</strong> from this location. This distance is measured
-          to the closest point on the mapped fault trace, the actual rupture zone may be wider.
+          to the closest point on the mapped fault trace. The actual rupture zone may be wider.
           Proximity to a fault is one of the most significant factors in seismic risk. Quaternary faults
           (those active within the last ~2.6 million years) are considered most likely to produce future
           earthquakes. Distance alone doesn't capture everything, fault type, local geology, and soil
@@ -1209,7 +1209,7 @@ const PanelController = (function () {
           <strong>${r.air.cesScore}th percentile</strong> means this tract has a higher cumulative
           environmental burden than <strong>${r.air.cesScore}%</strong> of all California census tracts.
           This score is used by CalEPA to identify disadvantaged communities for targeted investment
-          and environmental justice programs. It is a relative comparison tool, a high score does not
+          and environmental justice programs. It is a relative comparison tool. A high score does not
           mean a location is unsafe, but rather that it experiences more cumulative pollution burden
           than most other communities in the state.
         </div>
