@@ -845,10 +845,10 @@ function addLegendControls(map) {
 
       <div class="legend-section">
         <strong>Flood Hazard Zones (FEMA)</strong>
-        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#feb24c;"></span><em>0.2% Annual Chance Flood Hazard</em></div>
-        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#f03b20;"></span><em>1% Annual Chance Flood Hazard</em></div>
-        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#769ccd;"></span><em>Regulatory Floodway</em></div>
-        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#e5d099;"></span><em>Reduced Risk Due to Levee</em></div>
+        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#feb24c;"></span><em> 0.2% Annual Chance Flood Hazard</em></div>
+        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#f03b20;"></span><em> 1% Annual Chance Flood Hazard</em></div>
+        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#769ccd;"></span><em> Regulatory Floodway</em></div>
+        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#e5d099;"></span><em> Reduced Risk Due to Levee</em></div>
       </div>
 
       <div class="legend-section">
