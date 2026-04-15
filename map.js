@@ -82,7 +82,7 @@ const UI = {
 const NREL = {
   // API key has been moved to a Cloudflare Worker (nrel-proxy), never put it here again!
   WORKER_URL: "https://round-dust-6f7a.jerrod-lessel.workers.dev",
-  ATTRIBUTION: '<a href="https://afdc.energy.gov/stations/">NREL/AFDC</a>',
+  ATTRIBUTION: '<a href="https://afdc.energy.gov/stations/">NRL/AFDC</a>',
 };
 
 /* ============================================================================
