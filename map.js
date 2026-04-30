@@ -1,26 +1,26 @@
 /* ============================================================================
   map.js - Geospatial Manifold (Leaflet + Esri Leaflet)
-  VERSION: 2026-04-11.a
+  VERSION: 2026-04-29.a
 
   WHAT THIS FILE DOES:
-  - Initializes the map + basemap options
+  - Initializes the map + basemap options (full viewport, no top banner)
   - Creates ALL layers via "factory functions"
   - Registers layers in one place (LAYERS object)
   - Builds layer toggles from one place (LAYER_TOGGLES object)
   - Adds UI controls (layers control, home button, legend)
   - Implements click reporting via a slide-in dashboard panel:
       - Hazards tab: fire, flood, nearest fault
-      - Air Quality tab: ozone, PM2.5, drinking water (CalEnviroScreen)
+      - Environment & Health tab: CalEnviroScreen indicators
       - Geology tab: shaking potential (MMI), landslide susceptibility
   - PDF export of full location report
-  - EV charger overlay (OpenChargeMap) with debounced fetching
+  - EV charger overlay with Cloudflare Worker proxy
 
   DEBUGGING:
   - If UI disappears: open DevTools Console and look for errors.
 ============================================================================ */
 
 /* ============================================================================
-  0) GLOBAL SAFETY NETS (debug helpers)
+  0) GLOBAL SAFETY NETS
 ============================================================================ */
 window.addEventListener("error", (e) => {
   console.error("Uncaught error:", e.error || e.message);
@@ -42,8 +42,6 @@ const SERVICES = {
     "https://gis.conservation.ca.gov/server/rest/services/CGS/MS48_MMI_PGV_10pc50/ImageServer",
   FAULTS_REGIONAL_QUAT: "https://gis.conservation.ca.gov/server/rest/services/CGS/FaultActivityMapCA/MapServer/17",
   FAULTS_LOCAL_QUAT: "https://gis.conservation.ca.gov/server/rest/services/CGS/FaultActivityMapCA/MapServer/21",
-  USA_STATES_GENERALIZED:
-    "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_States_Generalized_Boundaries/FeatureServer/0",
   CA_BOUNDARY_DETAILED:
     "https://services.arcgis.com/ue9rwulIoeLEI9bj/arcgis/rest/services/US_StateBoundaries/FeatureServer/0",
   FIRE_SRA:
@@ -80,9 +78,9 @@ const UI = {
 };
 
 const NREL = {
-  // API key has been moved to a Cloudflare Worker (nrel-proxy), never put it here again!
+  // API key stored in Cloudflare Worker, never put it here
   WORKER_URL: "https://round-dust-6f7a.jerrod-lessel.workers.dev",
-  ATTRIBUTION: '<a href="https://afdc.energy.gov/stations/">NRL/AFDC</a>',
+  ATTRIBUTION: '<a href="https://afdc.energy.gov/stations/">NREL/AFDC</a>',
 };
 
 /* ============================================================================
@@ -106,9 +104,11 @@ function $(id) {
 ============================================================================ */
 
 function createMap() {
-  const m = L.map("map").setView([DEFAULT_VIEW.lat, DEFAULT_VIEW.lng], DEFAULT_VIEW.zoom);
+  const m = L.map("map", { zoomControl: false }).setView(
+    [DEFAULT_VIEW.lat, DEFAULT_VIEW.lng],
+    DEFAULT_VIEW.zoom
+  );
   setTimeout(() => m.invalidateSize(), 200);
-  // Expose so initAboutToggle can call invalidateSize after panel resize
   window._leafletMap = m;
   return m;
 }
@@ -137,7 +137,6 @@ function addCaliforniaFocusMask(map) {
     maskPane.style.pointerEvents = "none";
 
     const worldRing = [[-90,-180],[-90,180],[90,180],[90,-180],[-90,-180]];
-
     const states = L.esri.featureLayer({ url: SERVICES.CA_BOUNDARY_DETAILED });
 
     states.query().where("NAME = 'California'").returnGeometry(true).run((err, fc) => {
@@ -169,20 +168,19 @@ function addCaliforniaFocusMask(map) {
 }
 
 /* ============================================================================
-  4) UI HELPERS (About + Spinner)
+  4) UI HELPERS (About toggle + Spinner)
 ============================================================================ */
 
 function initAboutToggle() {
   $("about-toggle")?.addEventListener("click", function () {
     $("about-panel")?.classList.toggle("hidden");
-    // Give the browser one frame to reflow, then tell Leaflet the map size changed
+    // Tell Leaflet the map size may have shifted
     setTimeout(() => {
       if (window._leafletMap) window._leafletMap.invalidateSize();
     }, 50);
   });
 }
 
-// Spinner is now inside the slide panel, not the sidebar
 function showSpinner() {
   $("panel-spinner")?.classList.remove("hidden");
 }
@@ -251,22 +249,22 @@ function identifyLandslideAt(map, latlng, { tolerance = 8 } = {}) {
 }
 
 const MMI_CLASSES = {
-  1: { roman: "I",   desc: "Not felt" },
-  2: { roman: "II",  desc: "Weak" },
-  3: { roman: "III", desc: "Weak" },
-  4: { roman: "IV",  desc: "Light" },
-  5: { roman: "V",   desc: "Moderate" },
-  6: { roman: "VI",  desc: "Strong" },
-  7: { roman: "VII", desc: "Very Strong" },
-  8: { roman: "VIII",desc: "Severe" },
-  9: { roman: "IX",  desc: "Violent" },
-  10: { roman: "X+", desc: "Extreme" },
+  1: { roman: "I",    desc: "Not felt" },
+  2: { roman: "II",   desc: "Weak" },
+  3: { roman: "III",  desc: "Weak" },
+  4: { roman: "IV",   desc: "Light" },
+  5: { roman: "V",    desc: "Moderate" },
+  6: { roman: "VI",   desc: "Strong" },
+  7: { roman: "VII",  desc: "Very Strong" },
+  8: { roman: "VIII", desc: "Severe" },
+  9: { roman: "IX",   desc: "Violent" },
+  10: { roman: "X+",  desc: "Extreme" },
 };
 
 function formatMMI(mmi) {
   const intClass = Math.max(1, Math.min(10, Math.floor(mmi)));
   const meta = MMI_CLASSES[intClass] || { roman: "?", desc: "Unknown" };
-  return { label: `${meta.roman} – ${meta.desc}`, intClass, valueStr: mmi.toFixed(1) };
+  return { label: `${meta.roman} - ${meta.desc}`, intClass, valueStr: mmi.toFixed(1) };
 }
 
 function identifyMMIAt(latlng) {
@@ -416,7 +414,6 @@ function createFaultsInteractiveLayer(map) {
 
   group.on("add",    () => { syncToZoom(); map.on("zoomend", syncToZoom); });
   group.on("remove", () => { map.off("zoomend", syncToZoom); group.clearLayers(); });
-
   group._regional = regional;
   group._local    = local;
   return group;
@@ -615,7 +612,6 @@ function createEvChargersLayer(map) {
     const centerLat = (sw.lat + ne.lat) / 2;
     const centerLng = (sw.lng + ne.lng) / 2;
 
-    // Route through Cloudflare Worker, key is stored securely there, never in this file
     const url = `${NREL.WORKER_URL}?fuel_type=ELEC&latitude=${centerLat}&longitude=${centerLng}&radius=100&status=E&access=public&state=CA&limit=200`;
 
     fetch(url)
@@ -677,23 +673,6 @@ function getDistanceToPolygonEdge(clickLatLng, feature) {
   return turf.distance(point, nearestPoint, { units: "miles" }).toFixed(2);
 }
 
-function getClosestFeatureByEdgeDistance(layer, clickLatLng, label, fieldName, _unused, callback) {
-  layer.query().nearby(clickLatLng, UI.NEARBY_METERS).run(function (err, fc) {
-    if (!err && fc.features.length > 0) {
-      let minDist = Infinity, bestFeature = null;
-      fc.features.forEach((feature) => {
-        const dist = parseFloat(getDistanceToPolygonEdge(clickLatLng, feature));
-        if (!isNaN(dist) && dist < minDist) { minDist = dist; bestFeature = feature; }
-      });
-      if (bestFeature) {
-        callback(`■ <strong>Nearest ${label}:</strong> ${bestFeature.properties[fieldName]}<br>📏 Distance: ${minDist.toFixed(2)} mi`);
-        return;
-      }
-    }
-    callback(`❌ <strong>${label}:</strong> No nearby zones found`);
-  });
-}
-
 function getDistanceToLineMiles(clickLatLng, feature) {
   const pt = turf.point([clickLatLng.lng, clickLatLng.lat]);
   const geom = feature?.geometry;
@@ -732,27 +711,18 @@ function findBestFaultName(props) {
 
 function queryFaultLayerNearby(faultFeatureLayer, latlng, meters) {
   return new Promise((resolve) => {
-    if (!faultFeatureLayer?.query) {
-      console.warn("[Faults] No query() method on layer");
-      return resolve({ err: "No query()", fc: null });
-    }
+    if (!faultFeatureLayer?.query) return resolve({ err: "No query()", fc: null });
 
     const degOffset = meters / 111320;
     const sw = L.latLng(latlng.lat - degOffset, latlng.lng - degOffset);
     const ne = L.latLng(latlng.lat + degOffset, latlng.lng + degOffset);
     const bounds = L.latLngBounds(sw, ne);
 
-    console.log("[Faults] Querying bounds:", bounds.toBBoxString(), "| url:", faultFeatureLayer.options?.url);
-
     faultFeatureLayer
       .query()
       .within(bounds)
       .returnGeometry(true)
-      .run((err, fc) => {
-        if (err) console.warn("[Faults] Query error:", err);
-        else console.log("[Faults] Features returned:", fc?.features?.length ?? 0, fc?.features?.[0]?.properties);
-        resolve({ err, fc });
-      });
+      .run((err, fc) => resolve({ err, fc }));
   });
 }
 
@@ -796,19 +766,22 @@ function makeZoomGatedLayer(map, innerLayer, minZoom) {
   map.on("overlayadd",    (e) => { if (e.layer === gate) { intendedOn = true;  sync(); } });
   map.on("overlayremove", (e) => { if (e.layer === gate) { intendedOn = false; if (gate.hasLayer(innerLayer)) gate.removeLayer(innerLayer); } });
   map.on("zoomend", sync);
-
   return gate;
 }
 
 /* ============================================================================
-  9) UI CONTROLS (Home + Legend)
+  9) UI CONTROLS (Zoom + Home + Legend)
 ============================================================================ */
+
+function addZoomControl(map) {
+  L.control.zoom({ position: "topleft" }).addTo(map);
+}
 
 function addHomeButton(map) {
   const homeButton = L.control({ position: "topleft" });
   homeButton.onAdd = function () {
     const btn = L.DomUtil.create("div", "home-button leaflet-control leaflet-bar");
-    btn.innerHTML = `<a href="#" id="home-button" title="Home"><span class="legend-icon">⌂</span></a>`;
+    btn.innerHTML = `<a href="#" id="home-button" title="Reset View"><span class="legend-icon">&#x2302;</span></a>`;
     btn.onclick = function () { map.setView([DEFAULT_VIEW.lat, DEFAULT_VIEW.lng], DEFAULT_VIEW.zoom); };
     L.DomEvent.disableScrollPropagation(btn);
     L.DomEvent.disableClickPropagation(btn);
@@ -822,7 +795,7 @@ function addLegendControls(map) {
     options: { position: "topright" },
     onAdd: function () {
       const c = L.DomUtil.create("div", "leaflet-bar custom-legend-button");
-      c.innerHTML = '<span class="legend-icon">☰</span>';
+      c.innerHTML = '<span class="legend-icon">&#x2630;</span>';
       c.title = "Toggle Legend";
       c.onclick = function () {
         const panels = document.getElementsByClassName("legend-panel");
@@ -898,7 +871,7 @@ function addLegendControls(map) {
           <span class="ramp-swatch" style="background:#4292c6;"></span>
           <span class="ramp-swatch" style="background:#08306b;"></span>
         </div>
-        <div class="legend-ramp-labels"><span>0–10</span><span>90–100</span></div>
+        <div class="legend-ramp-labels"><span>0-10</span><span>90-100</span></div>
       </div>
 
       <div class="legend-section">
@@ -931,29 +904,19 @@ function addLegendControls(map) {
 
 const PanelController = (function () {
 
-  // Tracks which tab is active
-  let _activeTab = "hazards";
-
-  // Stores the last fetched results so tabs can re-render without re-fetching
+  let _activeTab   = "hazards";
   let _lastResults = null;
+  let _lastLatLng  = null;
 
-  // Stores the last clicked latlng for the PDF header
-  let _lastLatLng = null;
-
-  function open() {
-    $("slide-panel")?.classList.remove("slide-panel-closed");
-  }
-
-  function close() {
-    $("slide-panel")?.classList.add("slide-panel-closed");
-  }
+  function open()  { $("slide-panel")?.classList.remove("slide-panel-closed"); }
+  function close() { $("slide-panel")?.classList.add("slide-panel-closed"); }
 
   function setCoords(latlng) {
     _lastLatLng = latlng;
     const el = $("panel-coords");
     if (el) el.textContent = `${latlng.lat.toFixed(5)}° N,  ${Math.abs(latlng.lng).toFixed(5)}° W`;
     const nameEl = $("panel-location-name");
-    if (nameEl) nameEl.textContent = "Loading…";
+    if (nameEl) nameEl.textContent = "Loading...";
   }
 
   function setLocationName(name) {
@@ -993,25 +956,19 @@ const PanelController = (function () {
     _renderTab(tab, _lastResults);
   }
 
-  // ---- Tab rendering ----
-
   function _renderTab(tab, r) {
     const body = $("panel-body");
     if (!body) return;
     body.innerHTML = "";
-
-    if (tab === "hazards")  _renderHazards(body, r);
-    if (tab === "air")      _renderAir(body, r);
-    if (tab === "geology")  _renderGeology(body, r);
+    if (tab === "hazards") _renderHazards(body, r);
+    if (tab === "air")     _renderAir(body, r);
+    if (tab === "geology") _renderGeology(body, r);
   }
 
   // ---- Helpers ----
 
   function _card(labelText, innerHTML) {
-    return `<div class="dash-card">
-      <div class="dash-card-label">${labelText}</div>
-      ${innerHTML}
-    </div>`;
+    return `<div class="dash-card"><div class="dash-card-label">${labelText}</div>${innerHTML}</div>`;
   }
 
   function _noData(msg) {
@@ -1058,17 +1015,15 @@ const PanelController = (function () {
 
   function _mmiColor(v) {
     const c = {
-      4: "rgb(255,255,191)", 5: "rgb(245,245,0)", 6: "rgb(247,206,0)",
-      7: "rgb(250,125,0)",   8: "rgb(253,42,0)",  9: "rgb(199,8,8)", 10: "rgb(140,8,8)"
+      4: "rgb(255,255,191)", 5: "rgb(245,245,0)",  6: "rgb(247,206,0)",
+      7: "rgb(250,125,0)",   8: "rgb(253,42,0)",   9: "rgb(199,8,8)", 10: "rgb(140,8,8)"
     };
     return c[v] || "#444";
   }
 
   const LANDSLIDE_ORDER = ["I","II","III","IV","V","VI","VII","VIII","IX","X"];
 
-  function _landslideIndex(roman) {
-    return LANDSLIDE_ORDER.indexOf(roman);
-  }
+  function _landslideIndex(roman) { return LANDSLIDE_ORDER.indexOf(roman); }
 
   function _landslideColor(idx) {
     if (idx >= 7) return "var(--haz-red)";
@@ -1079,8 +1034,6 @@ const PanelController = (function () {
   // ---- HAZARDS TAB ----
 
   function _renderHazards(body, r) {
-
-    // -- Fire --
     let fireHTML;
     if (r.fire.zone) {
       const pct   = _fireSeverityPct(r.fire.zone);
@@ -1090,9 +1043,7 @@ const PanelController = (function () {
           <span class="haz-badge ${_fireBadgeClass(r.fire.zone)}">${r.fire.zone}</span>
           <span style="font-size:0.7rem;color:var(--panel-text-muted)">${r.fire.area || ""} zone</span>
         </div>
-        <div class="severity-track">
-          <div class="severity-fill" style="width:${pct}%;background:${color}"></div>
-        </div>
+        <div class="severity-track"><div class="severity-fill" style="width:${pct}%;background:${color}"></div></div>
         <div class="severity-labels"><span>Moderate</span><span>High</span><span>Very High</span></div>
         <div class="dash-card-explain">
           This location falls within a <strong>${r.fire.zone}</strong> Fire Hazard Severity Zone
@@ -1119,13 +1070,10 @@ const PanelController = (function () {
     }
     body.insertAdjacentHTML("beforeend", fireHTML);
 
-    // -- Flood --
     let floodHTML;
     if (r.flood.zone) {
       floodHTML = _card("flood hazard zone", `
-        <div style="margin-bottom:8px;">
-          <span class="haz-badge ${_floodBadgeClass(r.flood.zone)}">${r.flood.zone}</span>
-        </div>
+        <div style="margin-bottom:8px;"><span class="haz-badge ${_floodBadgeClass(r.flood.zone)}">${r.flood.zone}</span></div>
         <div class="dash-card-explain">
           This location is within <strong>${r.flood.zone}</strong> according to FEMA's National Flood
           Hazard Layer (NFHL). The 1% Annual Chance Flood Hazard (also called the "100-year floodplain")
@@ -1151,7 +1099,6 @@ const PanelController = (function () {
     }
     body.insertAdjacentHTML("beforeend", floodHTML);
 
-    // -- Fault --
     let faultHTML;
     if (r.fault.name) {
       faultHTML = _card("nearest mapped fault", `
@@ -1181,7 +1128,6 @@ const PanelController = (function () {
   // ---- ENVIRONMENT & HEALTH TAB ----
 
   function _renderAir(body, r) {
-
     const hasAny = r.air.ozone !== null || r.air.pm !== null || r.air.water !== null ||
                    r.air.diesel !== null || r.air.pesticide !== null ||
                    r.air.lead !== null || r.air.asthma !== null || r.air.cesScore !== null;
@@ -1191,7 +1137,6 @@ const PanelController = (function () {
       return;
     }
 
-    // -- Overall CES Score (shown first, prominently) --
     if (r.air.cesScore !== null) {
       const scoreColor = _pctBarColor(r.air.cesScore);
       body.insertAdjacentHTML("beforeend", _card("overall calenviroscreen 4.0 score", `
@@ -1199,9 +1144,7 @@ const PanelController = (function () {
           <span class="dash-card-value">${r.air.cesScore}th</span>
           <span class="dash-card-sub" style="margin:0;">percentile statewide</span>
         </div>
-        <div class="severity-track">
-          <div class="severity-fill" style="width:${r.air.cesScore}%;background:${scoreColor}"></div>
-        </div>
+        <div class="severity-track"><div class="severity-fill" style="width:${r.air.cesScore}%;background:${scoreColor}"></div></div>
         <div class="severity-labels"><span>0th (lowest burden)</span><span>100th (highest)</span></div>
         <div class="dash-card-explain">
           The overall CalEnviroScreen score combines all pollution burden and population vulnerability
@@ -1216,28 +1159,24 @@ const PanelController = (function () {
       `));
     }
 
-    // -- Summary bar chart (all available indicators) --
     const summaryRows = [
-      { name: "Ozone",       val: r.air.ozone },
-      { name: "PM2.5",       val: r.air.pm },
-      { name: "Diesel PM",   val: r.air.diesel },
-      { name: "Pesticides",  val: r.air.pesticide },
-      { name: "Water",       val: r.air.water },
-      { name: "Lead Risk",   val: r.air.lead },
-      { name: "Asthma",      val: r.air.asthma },
+      { name: "Ozone",      val: r.air.ozone },
+      { name: "PM2.5",      val: r.air.pm },
+      { name: "Diesel PM",  val: r.air.diesel },
+      { name: "Pesticides", val: r.air.pesticide },
+      { name: "Water",      val: r.air.water },
+      { name: "Lead Risk",  val: r.air.lead },
+      { name: "Asthma",     val: r.air.asthma },
     ].filter((row) => row.val !== null);
 
     if (summaryRows.length > 0) {
       const barsHTML = summaryRows.map((row) => `
         <div class="pct-row">
           <div class="pct-name">${row.name}</div>
-          <div class="pct-track">
-            <div class="pct-fill" style="width:${row.val}%;background:${_pctBarColor(row.val)}"></div>
-          </div>
+          <div class="pct-track"><div class="pct-fill" style="width:${row.val}%;background:${_pctBarColor(row.val)}"></div></div>
           <div class="pct-val">${row.val}th</div>
         </div>
       `).join("");
-
       body.insertAdjacentHTML("beforeend", _card("indicator summary - statewide percentiles", `
         <div class="dash-card-sub" style="margin-bottom:10px;">
           Each bar shows how this census tract compares to all others statewide.
@@ -1246,8 +1185,6 @@ const PanelController = (function () {
         ${barsHTML}
       `));
     }
-
-    // -- Individual indicator cards --
 
     if (r.air.ozone !== null) {
       body.insertAdjacentHTML("beforeend", _card("ozone (ground-level)", `
@@ -1259,8 +1196,8 @@ const PanelController = (function () {
           Ground-level ozone forms when sunlight reacts with pollutants from cars, power plants, and
           industrial sources. Unlike the protective ozone layer high in the atmosphere, ground-level
           ozone irritates the airways, aggravates asthma and respiratory disease, and can reduce lung
-          function even in healthy people. This indicator summarizes warm-season (May–October) ozone
-          conditions from 2017–2019. A percentile of <strong>${r.air.ozone}</strong> means this tract
+          function even in healthy people. This indicator summarizes warm-season (May-October) ozone
+          conditions from 2017-2019. A percentile of <strong>${r.air.ozone}</strong> means this tract
           has higher ozone exposure than <strong>${r.air.ozone}%</strong> of California census tracts.
         </div>
       `));
@@ -1277,7 +1214,7 @@ const PanelController = (function () {
           a human hair. They come from combustion sources like cars, trucks, wildfires, and industry,
           and can penetrate deep into the lungs and bloodstream. Long-term exposure is linked to
           cardiovascular and respiratory disease, premature death, and developmental issues in children.
-          This indicator uses annual average concentrations from 2015–2017. A percentile of
+          This indicator uses annual average concentrations from 2015-2017. A percentile of
           <strong>${r.air.pm}</strong> means this tract has higher PM2.5 than
           <strong>${r.air.pm}%</strong> of California census tracts.
         </div>
@@ -1295,10 +1232,8 @@ const PanelController = (function () {
           buses, trains, construction equipment, and ships. Diesel exhaust contains a complex mixture
           of gases and fine particles that are classified as a known carcinogen by the State of California.
           Communities near freeways, ports, rail yards, and distribution centers tend to have higher
-          diesel PM exposure. This indicator reflects modeled emissions estimates and is particularly
-          relevant in the Central Valley and near major freight corridors. A percentile of
-          <strong>${r.air.diesel}</strong> means this tract has higher diesel PM exposure than
-          <strong>${r.air.diesel}%</strong> of California census tracts.
+          diesel PM exposure. A percentile of <strong>${r.air.diesel}</strong> means this tract has
+          higher diesel PM exposure than <strong>${r.air.diesel}%</strong> of California census tracts.
         </div>
       `));
     }
@@ -1311,16 +1246,12 @@ const PanelController = (function () {
         </div>
         <div class="dash-card-explain">
           This indicator measures total pounds of selected agricultural pesticide active ingredients
-          applied per square mile in the census tract, based on California Department of Pesticide
-          Regulation (DPR) data. A high percentile reflects heavy nearby agricultural pesticide use,
-          it does not mean residents are being directly exposed or are in immediate danger. The primary
-          concern is for people with regular or occupational exposure, particularly farmworkers and
-          those living immediately adjacent to treated fields. Research has found associations between
-          chronic high-level pesticide exposure and certain health outcomes including neurological
-          effects and some cancers, though risk depends heavily on the specific chemicals, exposure
-          duration, and individual factors. A percentile of <strong>${r.air.pesticide}</strong> means
-          this tract has higher reported pesticide use than <strong>${r.air.pesticide}%</strong> of
-          California census tracts.
+          applied per square mile in the census tract, based on California DPR data. A high percentile
+          reflects heavy nearby agricultural pesticide use, it does not mean residents are being directly
+          exposed or are in immediate danger. The primary concern is for people with regular or
+          occupational exposure, particularly farmworkers and those living immediately adjacent to
+          treated fields. A percentile of <strong>${r.air.pesticide}</strong> means this tract has
+          higher reported pesticide use than <strong>${r.air.pesticide}%</strong> of California census tracts.
         </div>
       `));
     }
@@ -1333,13 +1264,10 @@ const PanelController = (function () {
         </div>
         <div class="dash-card-explain">
           This indicator combines contaminant levels and regulatory violations from drinking water
-          systems serving this area, based on data from 2011–2019 compliance cycles. Contaminants
-          tracked include nitrates, arsenic, hexavalent chromium, and other regulated substances.
-          A higher score indicates a water system with more contaminant detections or more frequent
-          violations. This is particularly relevant in rural areas and disadvantaged communities
-          where aging infrastructure or agricultural runoff may affect water quality. A percentile of
-          <strong>${r.air.water}</strong> means this tract has a higher drinking water burden than
-          <strong>${r.air.water}%</strong> of California census tracts.
+          systems serving this area, based on data from 2011-2019 compliance cycles. A higher score
+          indicates a water system with more contaminant detections or more frequent violations. A
+          percentile of <strong>${r.air.water}</strong> means this tract has a higher drinking water
+          burden than <strong>${r.air.water}%</strong> of California census tracts.
         </div>
       `));
     }
@@ -1353,14 +1281,11 @@ const PanelController = (function () {
         <div class="dash-card-explain">
           This indicator (new in CalEnviroScreen 4.0) estimates the risk of lead exposure for
           children from housing, based on the age of homes and the prevalence of low-income households
-          with children under 6. Older homes (built before 1978) are more likely to contain lead-based
-          paint, which is the leading source of lead poisoning in children. Low-income households are
-          less likely to have undergone renovations or lead abatement. There is no safe level of lead
-          exposure for children, even low levels can affect brain development, learning, and behavior.
-          This is a risk indicator based on housing characteristics, not a measurement of actual
-          blood lead levels. A percentile of <strong>${r.air.lead}</strong> means children in this
-          tract face higher estimated lead exposure risk than those in
-          <strong>${r.air.lead}%</strong> of California census tracts.
+          with children under 6. There is no safe level of lead exposure for children, even low levels
+          can affect brain development, learning, and behavior. This is a risk indicator based on
+          housing characteristics, not a measurement of actual blood lead levels. A percentile of
+          <strong>${r.air.lead}</strong> means children in this tract face higher estimated lead
+          exposure risk than those in <strong>${r.air.lead}%</strong> of California census tracts.
         </div>
       `));
     }
@@ -1373,11 +1298,8 @@ const PanelController = (function () {
         </div>
         <div class="dash-card-explain">
           This indicator measures age-adjusted rates of emergency department visits for asthma
-          per 10,000 residents, based on patient ZIP code data. Unlike the air quality indicators
-          above which measure pollutant levels, this is a direct health outcome measure, it shows
-          where people are actually going to the ER for breathing emergencies. High asthma ED rates
-          are strongly associated with elevated air pollution, but also reflect factors like access
-          to preventive healthcare, housing quality, and socioeconomic conditions. A percentile of
+          per 10,000 residents, based on patient ZIP code data. Unlike the pollution indicators above
+          which measure exposure levels, this is a direct health outcome measure. A percentile of
           <strong>${r.air.asthma}</strong> means this tract has higher asthma ED visit rates than
           <strong>${r.air.asthma}%</strong> of California census tracts.
         </div>
@@ -1388,8 +1310,6 @@ const PanelController = (function () {
   // ---- GEOLOGY TAB ----
 
   function _renderGeology(body, r) {
-
-    // -- MMI Shaking --
     if (r.geo.mmi !== null) {
       const fmt    = formatMMI(r.geo.mmi);
       const mmiInt = fmt.intClass;
@@ -1419,7 +1339,6 @@ const PanelController = (function () {
       body.insertAdjacentHTML("beforeend", _noData("Shaking potential data is not available for this location."));
     }
 
-    // -- Landslide --
     if (r.geo.landslide) {
       const idx   = _landslideIndex(r.geo.landslide);
       const pct   = idx >= 0 ? ((idx + 1) / LANDSLIDE_ORDER.length) * 100 : 0;
@@ -1430,19 +1349,15 @@ const PanelController = (function () {
           <span class="dash-card-value">Class ${r.geo.landslide}</span>
           <span class="dash-card-sub" style="margin:0;">of X</span>
         </div>
-        <div class="severity-track">
-          <div class="severity-fill" style="width:${pct}%;background:${color}"></div>
-        </div>
+        <div class="severity-track"><div class="severity-fill" style="width:${pct}%;background:${color}"></div></div>
         <div class="severity-labels"><span>Class I (lowest)</span><span>Class X (highest)</span></div>
         <div class="dash-card-explain">
           This location falls within Landslide Susceptibility <strong>Class ${r.geo.landslide}</strong>
           according to CGS Map Sheet 58. The classification reflects the relative likelihood of slope
           failure based on geology, terrain steepness, and historical patterns, not an absolute
-          probability. Higher classes (VII–X) indicate terrain that is more prone to landslides,
+          probability. Higher classes (VII-X) indicate terrain that is more prone to landslides,
           debris flows, and earth movements under triggers like intense rainfall, prolonged saturation,
-          or strong earthquake shaking. This data is most relevant for land use planning, grading
-          permits, and evaluating development risk in hillside areas. It does not replace a site-specific
-          geotechnical investigation.
+          or strong earthquake shaking. It does not replace a site-specific geotechnical investigation.
         </div>
       `));
     } else {
@@ -1454,9 +1369,8 @@ const PanelController = (function () {
 
   function exportPDF() {
     const btn = $("export-pdf-btn");
-    if (btn) { btn.disabled = true; btn.textContent = "Generating PDF…"; }
+    if (btn) { btn.disabled = true; btn.textContent = "Generating PDF..."; }
 
-    // Build a self-contained printable div
     const lat  = _lastLatLng ? _lastLatLng.lat.toFixed(5) : "-";
     const lng  = _lastLatLng ? Math.abs(_lastLatLng.lng).toFixed(5) : "-";
     const name = $("panel-location-name")?.textContent || "Location Report";
@@ -1464,7 +1378,6 @@ const PanelController = (function () {
 
     const printEl = document.createElement("div");
     printEl.style.cssText = "font-family:Arial,sans-serif;color:#111;background:#fff;padding:24px;max-width:680px;";
-
     printEl.innerHTML = `
       <h1 style="margin:0 0 4px;font-size:18px;color:#0c1f2c;">Geospatial Manifold - Location Report</h1>
       <p style="margin:0 0 2px;font-size:12px;color:#555;">${name}</p>
@@ -1472,37 +1385,27 @@ const PanelController = (function () {
       <hr style="border:none;border-top:1px solid #ddd;margin-bottom:16px;">
     `;
 
-    // Render all three tabs into the print element
     const sections = [
       { tab: "hazards", title: "Hazards" },
-      { tab: "air",     title: "Air Quality" },
+      { tab: "air",     title: "Environment & Health" },
       { tab: "geology", title: "Geology" },
     ];
 
     sections.forEach(({ tab, title }) => {
-      const tempDiv = document.createElement("div");
-      tempDiv.style.cssText = "background:#fff;";
       _renderTab(tab, _lastResults);
-
-      // Copy current panel body HTML
       const bodyEl = $("panel-body");
       const sectionEl = document.createElement("div");
       sectionEl.innerHTML = `<h2 style="font-size:14px;color:#0c1f2c;margin:16px 0 8px;border-bottom:1px solid #eee;padding-bottom:4px;">${title}</h2>`;
-
-      // Extract text content from cards for clean PDF output
       const cards = bodyEl?.querySelectorAll(".dash-card, .no-data-card") || [];
       cards.forEach((card) => {
         const clone = card.cloneNode(true);
-        // Remove severity bars and MMI boxes (visual only)
         clone.querySelectorAll(".severity-track,.mmi-scale,.pct-track,.stat-row").forEach(el => el.remove());
         clone.style.cssText = "margin-bottom:12px;padding:10px;border:1px solid #ddd;border-radius:6px;background:#f9f9f9;";
         sectionEl.appendChild(clone);
       });
-
       printEl.appendChild(sectionEl);
     });
 
-    // Restore the active tab
     _renderTab(_activeTab, _lastResults);
 
     const opt = {
@@ -1519,18 +1422,11 @@ const PanelController = (function () {
       });
   }
 
-  // ---- Init (attach tab click listeners) ----
-
   function init() {
-    // Close button
     $("panel-close-btn")?.addEventListener("click", close);
-
-    // Tab buttons
     document.querySelectorAll(".panel-tab").forEach((btn) => {
       btn.addEventListener("click", () => _switchTab(btn.dataset.tab));
     });
-
-    // PDF export
     $("export-pdf-btn")?.addEventListener("click", exportPDF);
   }
 
@@ -1539,18 +1435,16 @@ const PanelController = (function () {
 })();
 
 /* ============================================================================
-  11) CLICK REPORT (feeds PanelController instead of a sidebar div)
+  11) CLICK REPORT
 ============================================================================ */
 
 function installClickReport(map, layers) {
   let clickMarker = null;
 
   map.on("click", function (e) {
-    // Drop a pin on the map
     if (clickMarker) map.removeLayer(clickMarker);
     clickMarker = L.marker(e.latlng).addTo(map);
 
-    // Open panel and show loading state
     PanelController.open();
     PanelController.setCoords(e.latlng);
     PanelController.showLoading();
@@ -1559,7 +1453,6 @@ function installClickReport(map, layers) {
     const lat = e.latlng.lat;
     const lng = e.latlng.lng;
 
-    // Result buckets - structured objects now, not HTML strings
     const results = {
       fire:  { zone: null, area: null, nearestZone: null, nearestDist: null },
       flood: { zone: null, nearestZone: null, nearestDist: null },
@@ -1574,16 +1467,15 @@ function installClickReport(map, layers) {
         asthma: null, asthmaRaw: null,
         cesScore: null,
       },
-      geo:   { mmi: null, landslide: null },
+      geo: { mmi: null, landslide: null },
     };
 
-    let completed  = 0;
-    const total    = 12; // number of async tasks below
+    let completed = 0;
+    const total   = 12;
 
     function checkDone() {
       completed++;
       if (completed === total) {
-        // Try to get a place name from reverse geocoding (best-effort, no API key needed)
         fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
           .then((r) => r.json())
           .then((data) => {
@@ -1599,7 +1491,6 @@ function installClickReport(map, layers) {
       }
     }
 
-    // ---- Helper: promise wrappers ----
     function queryContains(layer, latlng) {
       return new Promise((resolve) => {
         layer.query().contains(latlng).run((err, fc) => resolve({ err, fc }));
@@ -1626,150 +1517,89 @@ function installClickReport(map, layers) {
       return best;
     }
 
-    // ---- Task 1: Fire ----
+    // Task 1: Fire
     (async () => {
       try {
         const lra = await queryContains(layers.fireHazardLRA, e.latlng);
-        if (!lra.err && lra.fc?.features?.length) {
-          results.fire.zone = lra.fc.features[0].properties.FHSZ_Description;
-          results.fire.area = "LRA";
-          return;
-        }
+        if (!lra.err && lra.fc?.features?.length) { results.fire.zone = lra.fc.features[0].properties.FHSZ_Description; results.fire.area = "LRA"; return; }
         const sra = await queryContains(layers.fireHazardSRA, e.latlng);
-        if (!sra.err && sra.fc?.features?.length) {
-          results.fire.zone = sra.fc.features[0].properties.FHSZ_Description;
-          results.fire.area = "SRA";
-          return;
-        }
+        if (!sra.err && sra.fc?.features?.length) { results.fire.zone = sra.fc.features[0].properties.FHSZ_Description; results.fire.area = "SRA"; return; }
         const nearest = await nearestZoneAcross([layers.fireHazardLRA, layers.fireHazardSRA], "FHSZ_Description");
         if (nearest) { results.fire.nearestZone = nearest.zone; results.fire.nearestDist = nearest.dist.toFixed(2); }
-      } catch (ex) {
-        console.warn("Fire query error:", ex);
-      } finally { checkDone(); }
+      } catch (ex) { console.warn("Fire query error:", ex); }
+      finally { checkDone(); }
     })();
 
-    // ---- Task 2: Flood ----
+    // Task 2: Flood
     (async () => {
       try {
         const res = await queryContains(layers.floodLayer, e.latlng);
-        if (!res.err && res.fc?.features?.length) {
-          results.flood.zone = res.fc.features[0].properties.ESRI_SYMBOLOGY;
-          return;
-        }
+        if (!res.err && res.fc?.features?.length) { results.flood.zone = res.fc.features[0].properties.ESRI_SYMBOLOGY; return; }
         const nearest = await nearestZoneAcross([layers.floodLayer], "ESRI_SYMBOLOGY");
         if (nearest) { results.flood.nearestZone = nearest.zone; results.flood.nearestDist = nearest.dist.toFixed(2); }
-      } catch (ex) {
-        console.warn("Flood query error:", ex);
-      } finally { checkDone(); }
+      } catch (ex) { console.warn("Flood query error:", ex); }
+      finally { checkDone(); }
     })();
 
-    // ---- Task 3: Fault ----
+    // Task 3: Fault
     (async () => {
       try {
         const info = await getNearestFaultInfo(layers.faultsLayer, e.latlng);
         results.fault.name = info.name;
         results.fault.dist = info.dist;
-      } catch (ex) {
-        console.warn("Fault query error:", ex);
-      } finally { checkDone(); }
+      } catch (ex) { console.warn("Fault query error:", ex); }
+      finally { checkDone(); }
     })();
 
-    // ---- Task 4: Ozone ----
+    // Task 4: Ozone
     layers.ozoneLayer.query().contains(e.latlng).run((err, fc) => {
-      try {
-        if (!err && fc.features.length > 0) {
-          const p = fc.features[0].properties;
-          results.air.ozone    = p.ozoneP !== undefined ? Math.round(p.ozoneP) : null;
-          results.air.ozoneRaw = p.ozone  ?? null;
-        }
-      } catch (ex) { console.warn("Ozone query error:", ex); }
-      finally { checkDone(); }
+      try { if (!err && fc.features.length > 0) { const p = fc.features[0].properties; results.air.ozone = p.ozoneP !== undefined ? Math.round(p.ozoneP) : null; results.air.ozoneRaw = p.ozone ?? null; } }
+      catch (ex) { console.warn("Ozone query error:", ex); } finally { checkDone(); }
     });
 
-    // ---- Task 5: PM2.5 ----
+    // Task 5: PM2.5
     layers.pmLayer.query().contains(e.latlng).run((err, fc) => {
-      try {
-        if (!err && fc.features.length > 0) {
-          const p = fc.features[0].properties;
-          results.air.pm    = p.pmP !== undefined ? Math.round(p.pmP) : null;
-          results.air.pmRaw = p.pm ?? null;
-        }
-      } catch (ex) { console.warn("PM2.5 query error:", ex); }
-      finally { checkDone(); }
+      try { if (!err && fc.features.length > 0) { const p = fc.features[0].properties; results.air.pm = p.pmP !== undefined ? Math.round(p.pmP) : null; results.air.pmRaw = p.pm ?? null; } }
+      catch (ex) { console.warn("PM2.5 query error:", ex); } finally { checkDone(); }
     });
 
-    // ---- Task 6: Drinking Water ----
+    // Task 6: Drinking Water
     layers.drinkLayer.query().contains(e.latlng).run((err, fc) => {
-      try {
-        if (!err && fc.features.length > 0) {
-          const p = fc.features[0].properties;
-          results.air.water    = p.drinkP !== undefined ? Math.round(p.drinkP) : null;
-          results.air.waterRaw = p.drink ?? null;
-        }
-      } catch (ex) { console.warn("Drinking water query error:", ex); }
-      finally { checkDone(); }
+      try { if (!err && fc.features.length > 0) { const p = fc.features[0].properties; results.air.water = p.drinkP !== undefined ? Math.round(p.drinkP) : null; results.air.waterRaw = p.drink ?? null; } }
+      catch (ex) { console.warn("Drinking water query error:", ex); } finally { checkDone(); }
     });
 
-    // ---- Task 8: Diesel PM ----
+    // Task 8: Diesel PM
     layers.dieselLayer.query().contains(e.latlng).run((err, fc) => {
-      try {
-        if (!err && fc.features.length > 0) {
-          const p = fc.features[0].properties;
-          results.air.diesel    = p.dieselP !== undefined ? Math.round(p.dieselP) : null;
-          results.air.dieselRaw = p.diesel ?? null;
-        }
-      } catch (ex) { console.warn("Diesel PM query error:", ex); }
-      finally { checkDone(); }
+      try { if (!err && fc.features.length > 0) { const p = fc.features[0].properties; results.air.diesel = p.dieselP !== undefined ? Math.round(p.dieselP) : null; results.air.dieselRaw = p.diesel ?? null; } }
+      catch (ex) { console.warn("Diesel PM query error:", ex); } finally { checkDone(); }
     });
 
-    // ---- Task 9: Pesticides ----
+    // Task 9: Pesticides
     layers.pesticideLayer.query().contains(e.latlng).run((err, fc) => {
-      try {
-        if (!err && fc.features.length > 0) {
-          const p = fc.features[0].properties;
-          results.air.pesticide    = p.pestP !== undefined ? Math.round(p.pestP) : null;
-          results.air.pesticideRaw = p.pest ?? null;
-        }
-      } catch (ex) { console.warn("Pesticide query error:", ex); }
-      finally { checkDone(); }
+      try { if (!err && fc.features.length > 0) { const p = fc.features[0].properties; results.air.pesticide = p.pestP !== undefined ? Math.round(p.pestP) : null; results.air.pesticideRaw = p.pest ?? null; } }
+      catch (ex) { console.warn("Pesticide query error:", ex); } finally { checkDone(); }
     });
 
-    // ---- Task 10: Children's Lead Risk ----
+    // Task 10: Lead Risk
     layers.leadLayer.query().contains(e.latlng).run((err, fc) => {
-      try {
-        if (!err && fc.features.length > 0) {
-          const p = fc.features[0].properties;
-          results.air.lead    = p.leadP !== undefined ? Math.round(p.leadP) : null;
-          results.air.leadRaw = p.lead ?? null;
-        }
-      } catch (ex) { console.warn("Lead risk query error:", ex); }
-      finally { checkDone(); }
+      try { if (!err && fc.features.length > 0) { const p = fc.features[0].properties; results.air.lead = p.leadP !== undefined ? Math.round(p.leadP) : null; results.air.leadRaw = p.lead ?? null; } }
+      catch (ex) { console.warn("Lead risk query error:", ex); } finally { checkDone(); }
     });
 
-    // ---- Task 11: Asthma ----
+    // Task 11: Asthma
     layers.asthmaLayer.query().contains(e.latlng).run((err, fc) => {
-      try {
-        if (!err && fc.features.length > 0) {
-          const p = fc.features[0].properties;
-          results.air.asthma    = p.asthmaP !== undefined ? Math.round(p.asthmaP) : null;
-          results.air.asthmaRaw = p.asthma ?? null;
-        }
-      } catch (ex) { console.warn("Asthma query error:", ex); }
-      finally { checkDone(); }
+      try { if (!err && fc.features.length > 0) { const p = fc.features[0].properties; results.air.asthma = p.asthmaP !== undefined ? Math.round(p.asthmaP) : null; results.air.asthmaRaw = p.asthma ?? null; } }
+      catch (ex) { console.warn("Asthma query error:", ex); } finally { checkDone(); }
     });
 
-    // ---- Task 12: Overall CES Score ----
+    // Task 12: CES Score
     layers.cesScoreLayer.query().contains(e.latlng).run((err, fc) => {
-      try {
-        if (!err && fc.features.length > 0) {
-          const p = fc.features[0].properties;
-          results.air.cesScore = p.CIscoreP !== undefined ? Math.round(p.CIscoreP) : null;
-        }
-      } catch (ex) { console.warn("CES score query error:", ex); }
-      finally { checkDone(); }
+      try { if (!err && fc.features.length > 0) { const p = fc.features[0].properties; results.air.cesScore = p.CIscoreP !== undefined ? Math.round(p.CIscoreP) : null; } }
+      catch (ex) { console.warn("CES score query error:", ex); } finally { checkDone(); }
     });
 
-    // ---- Task 7: Landslide + MMI (combined since both are identify calls) ----
+    // Task 7: Landslide + MMI
     (async () => {
       try {
         const [label, mmi] = await Promise.all([
@@ -1778,9 +1608,8 @@ function installClickReport(map, layers) {
         ]);
         results.geo.landslide = label ?? null;
         results.geo.mmi       = mmi   ?? null;
-      } catch (ex) {
-        console.warn("Geology identify error:", ex);
-      } finally { checkDone(); }
+      } catch (ex) { console.warn("Geology identify error:", ex); }
+      finally { checkDone(); }
     })();
   });
 }
@@ -1790,77 +1619,68 @@ function installClickReport(map, layers) {
 ============================================================================ */
 
 (function main() {
-  // 1) Basic UI setup
   initAboutToggle();
   PanelController.init();
 
-  // 2) Create map + basemaps
   const map = createMap();
   const basemaps = createBasemaps();
 
-  basemaps.baseOSM.addTo(map);
+  basemaps.cartoDark.addTo(map);
   addCaliforniaFocusMask(map);
 
-  // 3) Create layers
   const fire        = createFireLayers();
   const ev          = createEvChargersLayer(map);
   const universities = createUniversitiesLayer();
 
   const LAYERS = {
-    landslideLayer:   createLandslideVisualLayer(),
-    shakingLayer:     createShakingVisualLayer(),
-    faultsLayer:      createFaultsInteractiveLayer(map),
-    floodLayer:       createFloodLayer(),
-    fireHazardSRA:    fire.fireHazardSRA,
-    fireHazardLRA:    fire.fireHazardLRA,
-    fireHazardLayer:  fire.fireHazardLayer,
-    activeFires:      createActiveFiresLayer(),
-    ozoneLayer:       createCesLayer("ozoneP IS NOT NULL",      "ozoneP"),
-    pmLayer:          createCesLayer("pmP IS NOT NULL",          "pmP"),
-    drinkLayer:       createCesLayer("drinkP IS NOT NULL",       "drinkP"),
-    dieselLayer:      createCesLayer("dieselP IS NOT NULL",      "dieselP"),
-    pesticideLayer:   createCesLayer("pestP IS NOT NULL",      "pestP"),
-    leadLayer:        createCesLayer("leadP IS NOT NULL",        "leadP"),
-    asthmaLayer:      createCesLayer("asthmaP IS NOT NULL",      "asthmaP"),
-    cesScoreLayer:    createCesLayer("CIscoreP IS NOT NULL",     "CIscoreP"),
-    highwayLayer:     createHighwayLayer(),
-    allRoadsLayer:    createAllRoadsLayer(),
-    schoolsLayer:     makeZoomGatedLayer(map, createSchoolsLayer(),       UI.ZOOM_POI_MIN),
-    healthCenters:    makeZoomGatedLayer(map, createHealthCentersLayer(),  UI.ZOOM_POI_MIN),
-    airports:         makeZoomGatedLayer(map, createAirportsLayer(),       UI.ZOOM_POI_MIN),
-    powerPlants:      makeZoomGatedLayer(map, createPowerPlantsLayer(),    UI.ZOOM_POI_MIN),
-    stateBridges:     makeZoomGatedLayer(map, createStateBridgesLayer(),   UI.ZOOM_POI_MIN),
-    localBridges:     makeZoomGatedLayer(map, createLocalBridgesLayer(),   UI.ZOOM_POI_MIN),
-    parks:            makeZoomGatedLayer(map, createParksLayer(),          UI.ZOOM_POI_MIN),
-    fireStations:     makeZoomGatedLayer(map, createFireStationsLayer(),   UI.ZOOM_POI_MIN),
-    universitiesRaw:  universities.layer,
-    universities:     makeZoomGatedLayer(map, universities.layer,          UI.ZOOM_POI_MIN),
-    evChargers:       ev.layer,
+    landslideLayer:  createLandslideVisualLayer(),
+    shakingLayer:    createShakingVisualLayer(),
+    faultsLayer:     createFaultsInteractiveLayer(map),
+    floodLayer:      createFloodLayer(),
+    fireHazardSRA:   fire.fireHazardSRA,
+    fireHazardLRA:   fire.fireHazardLRA,
+    fireHazardLayer: fire.fireHazardLayer,
+    activeFires:     createActiveFiresLayer(),
+    ozoneLayer:      createCesLayer("ozoneP IS NOT NULL",    "ozoneP"),
+    pmLayer:         createCesLayer("pmP IS NOT NULL",       "pmP"),
+    drinkLayer:      createCesLayer("drinkP IS NOT NULL",    "drinkP"),
+    dieselLayer:     createCesLayer("dieselP IS NOT NULL",   "dieselP"),
+    pesticideLayer:  createCesLayer("pestP IS NOT NULL",     "pestP"),
+    leadLayer:       createCesLayer("leadP IS NOT NULL",     "leadP"),
+    asthmaLayer:     createCesLayer("asthmaP IS NOT NULL",   "asthmaP"),
+    cesScoreLayer:   createCesLayer("CIscoreP IS NOT NULL",  "CIscoreP"),
+    highwayLayer:    createHighwayLayer(),
+    allRoadsLayer:   createAllRoadsLayer(),
+    schoolsLayer:    makeZoomGatedLayer(map, createSchoolsLayer(),      UI.ZOOM_POI_MIN),
+    healthCenters:   makeZoomGatedLayer(map, createHealthCentersLayer(), UI.ZOOM_POI_MIN),
+    airports:        makeZoomGatedLayer(map, createAirportsLayer(),     UI.ZOOM_POI_MIN),
+    powerPlants:     makeZoomGatedLayer(map, createPowerPlantsLayer(),  UI.ZOOM_POI_MIN),
+    stateBridges:    makeZoomGatedLayer(map, createStateBridgesLayer(), UI.ZOOM_POI_MIN),
+    localBridges:    makeZoomGatedLayer(map, createLocalBridgesLayer(), UI.ZOOM_POI_MIN),
+    parks:           makeZoomGatedLayer(map, createParksLayer(),        UI.ZOOM_POI_MIN),
+    fireStations:    makeZoomGatedLayer(map, createFireStationsLayer(), UI.ZOOM_POI_MIN),
+    universitiesRaw: universities.layer,
+    universities:    makeZoomGatedLayer(map, universities.layer,        UI.ZOOM_POI_MIN),
+    evChargers:      ev.layer,
   };
 
-  // 4) Install EV handlers
   ev.installHandlers();
 
-  // 5) Roads zoom switching
   (function installRoadZoomSwitching() {
-    let highwayWanted  = false;
-    let allRoadsWanted = false;
-
+    let highwayWanted = false, allRoadsWanted = false;
     function syncRoads() {
       const z = map.getZoom();
-      if (highwayWanted  && z <= UI.ZOOM_ROADS_SWITCH) { if (!map.hasLayer(LAYERS.highwayLayer))  map.addLayer(LAYERS.highwayLayer);  }
+      if (highwayWanted  && z <= UI.ZOOM_ROADS_SWITCH) { if (!map.hasLayer(LAYERS.highwayLayer))  map.addLayer(LAYERS.highwayLayer); }
       else { if (map.hasLayer(LAYERS.highwayLayer))  map.removeLayer(LAYERS.highwayLayer); }
       if (allRoadsWanted && z >  UI.ZOOM_ROADS_SWITCH) { if (!map.hasLayer(LAYERS.allRoadsLayer)) map.addLayer(LAYERS.allRoadsLayer); }
       else { if (map.hasLayer(LAYERS.allRoadsLayer)) map.removeLayer(LAYERS.allRoadsLayer); }
     }
-
     map.on("overlayadd",    (e) => { if (e.layer === LAYERS.highwayLayer) highwayWanted = true;  if (e.layer === LAYERS.allRoadsLayer) allRoadsWanted = true;  syncRoads(); });
     map.on("overlayremove", (e) => { if (e.layer === LAYERS.highwayLayer) highwayWanted = false; if (e.layer === LAYERS.allRoadsLayer) allRoadsWanted = false; syncRoads(); });
     map.on("zoomend", syncRoads);
     syncRoads();
   })();
 
-  // 6) Layer controls
   const LAYER_TOGGLES = {
     "Schools":                    LAYERS.schoolsLayer,
     "Universities":               LAYERS.universities,
@@ -1895,18 +1715,16 @@ function installClickReport(map, layers) {
     LAYER_TOGGLES
   ).addTo(map);
 
-  // 7) Scale, home, legend
   L.control.scale({ imperial: true }).addTo(map);
+  addZoomControl(map);
   addHomeButton(map);
   addLegendControls(map);
 
-  // 8) University domain decoding
   LAYERS.universitiesRaw.metadata((err, md) => {
     if (err) console.warn("Colleges metadata error:", err);
     else universities.buildDomainMaps(md);
   });
 
-  // 9) Click reporting (feeds slide panel)
   installClickReport(map, {
     fireHazardSRA:  LAYERS.fireHazardSRA,
     fireHazardLRA:  LAYERS.fireHazardLRA,
@@ -1922,7 +1740,6 @@ function installClickReport(map, layers) {
     faultsLayer:    LAYERS.faultsLayer,
   });
 
-  // 10) Initial road sync
   map.fire("zoomend");
 
 })();
