@@ -1,14 +1,11 @@
 <!-- =========================================================
      GEOSPATIAL MANIFOLD
-     VERSION: 2026-04-11.a
+     VERSION: 2026-04-29.a
      ========================================================= -->
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- =========================================================
-       BASIC META + TAB TITLE
-       ========================================================= -->
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Geospatial Manifold</title>
@@ -55,115 +52,100 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js"></script>
 
   <!-- =========================================================
-       CHART.JS — for dashboard charts in the slide panel
+       CHART.JS
        ========================================================= -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 
   <!-- =========================================================
-       HTML2PDF — for PDF export of the location report
+       HTML2PDF
        ========================================================= -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
-  <!-- =========================================================
-       YOUR SITE CSS
-       ========================================================= -->
   <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
 
   <!-- =========================================================
-       TOP BANNER
+       FULL-VIEWPORT MAP CONTAINER
        ========================================================= -->
-  <div id="top-banner">
-    <div id="left-banner">
-      <img id="site-logo" src="logo.png" alt="Site Logo">
-      <div id="titles">
-        <span id="main-title">Geospatial Manifold</span>
-        <span id="subtitle">Mapping risks, resources, and resilience across California</span>
+  <div id="map"></div>
+
+  <!-- =========================================================
+       FLOATING TITLE CARD (bottom-left, overlays the map)
+       ========================================================= -->
+  <div id="title-card">
+    <div id="title-card-main">
+      <img id="title-logo" src="favicon.ico" alt="Geospatial Manifold logo" />
+      <div id="title-text">
+        <div id="title-name">Geospatial Manifold</div>
+        <div id="title-tagline">Mapping risks, resources, and resilience across California</div>
+      </div>
+      <button id="about-toggle" title="About this tool" aria-label="Toggle about panel">?</button>
+    </div>
+
+    <!-- About panel — hidden by default, expands inside card -->
+    <div id="about-panel" class="hidden">
+      <p>
+        Welcome to Geospatial Manifold — your tool for exploring hazard, health, and resilience
+        data across California. Click anywhere on the map to get a full location report with
+        charts, environmental data, and geological risk information.
+      </p>
+      <p>
+        Data comes from trusted sources including CAL FIRE, OEHHA, the California Geological
+        Survey, USGS, and FEMA.
+      </p>
+      <p>
+        Created by Jerrod Lessel, a geospatial analyst at Caltrans on California's Central Coast.
+      </p>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       SLIDE PANEL (right side, overlays the map)
+       ========================================================= -->
+  <div id="slide-panel" class="slide-panel-closed" aria-label="Location report panel">
+
+    <!-- Panel Header -->
+    <div id="panel-header">
+      <div id="panel-header-left">
+        <div id="panel-coords">Click the map to begin</div>
+        <div id="panel-location-name">Location Report</div>
+      </div>
+      <button id="panel-close-btn" title="Close panel" aria-label="Close panel">&#x2715;</button>
+    </div>
+
+    <!-- Loading spinner -->
+    <div id="panel-spinner" class="hidden">
+      <div class="panel-spinner-inner"></div>
+      <span>Loading data...</span>
+    </div>
+
+    <!-- Tab Bar -->
+    <div id="panel-tabs" class="hidden">
+      <button class="panel-tab active" data-tab="hazards">Hazards</button>
+      <button class="panel-tab" data-tab="air">Environment &amp; Health</button>
+      <button class="panel-tab" data-tab="geology">Geology</button>
+    </div>
+
+    <!-- Scrollable Panel Body -->
+    <div id="panel-body">
+      <div id="panel-welcome">
+        <div class="welcome-icon">&#x1F5FA;&#xFE0F;</div>
+        <p>Click anywhere on the map to generate a full location report with hazard data, environmental health indicators, and geological risk information.</p>
       </div>
     </div>
-    <button id="about-toggle" type="button">About</button>
-  </div>
 
-  <!-- =========================================================
-       ABOUT PANEL (COLLAPSIBLE)
-       ========================================================= -->
-  <div id="about-panel" class="hidden">
-    <h3>About Geospatial Manifold</h3>
-    <p>
-      Welcome to Geospatial Manifold! Your tool for exploring hazard, health, and resilience data across California.
-      Click anywhere on the map to get a full location report with charts, environmental data, and geological risk info.
-    </p>
-    <p>
-      Data comes from trusted sources including CAL FIRE, OEHHA, the California Geological Survey, USGS, and FEMA.
-    </p>
-    <p>
-      Created by Jerrod Lessel, a geospatial analyst at Caltrans on California's Central Coast.
-    </p>
-  </div>
-
-  <!-- =========================================================
-       MAIN CONTAINER — full width map only (no sidebar)
-       ========================================================= -->
-  <div id="container">
-
-    <!-- Full-width map -->
-    <div id="map"></div>
-
-    <!-- =========================================================
-         SLIDE PANEL — overlays the map from the right
-         Opens when user clicks the map.
-         ========================================================= -->
-    <div id="slide-panel" class="slide-panel-closed" aria-label="Location report panel">
-
-      <!-- Panel Header -->
-      <div id="panel-header">
-        <div id="panel-header-left">
-          <div id="panel-coords">Click the map to begin</div>
-          <div id="panel-location-name">Location Report</div>
-        </div>
-        <button id="panel-close-btn" title="Close panel" aria-label="Close panel">✕</button>
+    <!-- Panel Footer -->
+    <div id="panel-footer" class="hidden">
+      <button id="export-pdf-btn">&#x2B07; Export PDF Report</button>
+      <div id="donation-card">
+        <span class="donation-text">&#x2615; This tool is free &mdash; <a href="https://ko-fi.com/jerrodlessel" target="_blank" rel="noopener">support its development</a></span>
       </div>
-
-      <!-- Loading spinner (inside panel) -->
-      <div id="panel-spinner" class="hidden">
-        <div class="panel-spinner-inner"></div>
-        <span>Loading data…</span>
-      </div>
-
-      <!-- Tab Bar -->
-      <div id="panel-tabs" class="hidden">
-        <button class="panel-tab active" data-tab="hazards">Hazards</button>
-        <button class="panel-tab" data-tab="air">Environment &amp; Health</button>
-        <button class="panel-tab" data-tab="geology">Geology</button>
-      </div>
-
-      <!-- Scrollable Panel Body -->
-      <div id="panel-body">
-        <div id="panel-welcome">
-          <div class="welcome-icon">🗺️</div>
-          <p>Click anywhere on the map to generate a full location report with hazard data, environmental health indicators, and geological risk information.</p>
-        </div>
-      </div>
-
-      <!-- Panel Footer: Export + Donation -->
-      <div id="panel-footer" class="hidden">
-        <button id="export-pdf-btn">⬇ Export PDF Report</button>
-        <div id="donation-card">
-          <span class="donation-text">☕ This tool is free — <a href="https://ko-fi.com" target="_blank" rel="noopener">support its development</a></span>
-        </div>
-      </div>
-
     </div>
-    <!-- end #slide-panel -->
 
   </div>
-  <!-- end #container -->
 
-  <!-- =========================================================
-       MAIN APP JS
-       ========================================================= -->
   <script src="map.js"></script>
 </body>
 </html>
