@@ -1438,12 +1438,20 @@ const PanelController = (function () {
   11) CLICK REPORT
 ============================================================================ */
 
+// Pulsing click marker — matches Spectral Glimpse style
+const _clickMarkerIcon = L.divIcon({
+  className: "",
+  html: '<div class="click-marker-dot"></div>',
+  iconSize: [12, 12],
+  iconAnchor: [6, 6],
+});
+
 function installClickReport(map, layers) {
   let clickMarker = null;
 
   map.on("click", function (e) {
     if (clickMarker) map.removeLayer(clickMarker);
-    clickMarker = L.marker(e.latlng).addTo(map);
+    clickMarker = L.marker(e.latlng, { icon: _clickMarkerIcon }).addTo(map);
 
     PanelController.open();
     PanelController.setCoords(e.latlng);
@@ -1506,7 +1514,16 @@ function installClickReport(map, layers) {
     async function nearestZoneAcross(layersArr, fieldName) {
       let best = null;
       for (const lyr of layersArr) {
-        const { err, fc } = await queryNearby(lyr, latlng, UI.NEARBY_METERS);
+        // Use bounds query instead of .nearby() — .nearby() is unreliable on polygon layers
+        const degOffset = UI.NEARBY_METERS / 111320;
+        const sw = L.latLng(latlng.lat - degOffset, latlng.lng - degOffset);
+        const ne = L.latLng(latlng.lat + degOffset, latlng.lng + degOffset);
+        const bounds = L.latLngBounds(sw, ne);
+
+        const { err, fc } = await new Promise((resolve) => {
+          lyr.query().within(bounds).run((err, fc) => resolve({ err, fc }));
+        });
+
         if (err || !fc?.features?.length) continue;
         for (const f of fc.features) {
           const dist = parseFloat(getDistanceToPolygonEdge(e.latlng, f));
@@ -1710,12 +1727,12 @@ function installClickReport(map, layers) {
     "CES Overall Score":          LAYERS.cesScoreLayer,
   };
 
-  // Layer control at topleft — keeps topright clear for the legend toggle + panel only.
-  // collapsed:true hides the toggle button since we use our own custom legend button.
+  // Layer control at topright — styled with dark theme via CSS.
+  // The toggle button shows the hamburger icon and opens basemap + overlay selector.
   L.control.layers(
     { "OpenStreetMap": basemaps.baseOSM, "Esri Satellite": basemaps.esriSat, "Carto Light": basemaps.cartoLight, "Carto Dark": basemaps.cartoDark },
     LAYER_TOGGLES,
-    { position: "topleft", collapsed: true }
+    { position: "topright", collapsed: true }
   ).addTo(map);
 
   // Scale bar at bottomright above attribution
