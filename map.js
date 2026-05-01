@@ -1581,12 +1581,9 @@ function installClickReport(map, layers) {
     async function nearestZoneAcross(layersArr, fieldName) {
       let best = null;
       for (const lyr of layersArr) {
-        // Use intersects() to catch large polygons that span the area.
-        // returnGeometry(true) is required so Turf can calculate the exact
-        // distance to the polygon edge — same pattern as fault distance queries.
         const degOffset = UI.NEARBY_METERS / 111320;
-        const sw = L.latLng(latlng.lat - degOffset, latlng.lng - degOffset);
-        const ne = L.latLng(latlng.lat + degOffset, latlng.lng + degOffset);
+        const sw = L.latLng(e.latlng.lat - degOffset, e.latlng.lng - degOffset);
+        const ne = L.latLng(e.latlng.lat + degOffset, e.latlng.lng + degOffset);
         const bounds = L.latLngBounds(sw, ne);
 
         const { err, fc } = await new Promise((resolve) => {
