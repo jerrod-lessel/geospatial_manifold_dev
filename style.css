@@ -221,9 +221,15 @@ html, body {
   color: var(--ctrl-text) !important;
 }
 
+/* Layer control — toggle button hidden, we use our own legend button.
+   Panel expands when toggled via JS in addLegendControls. */
 .leaflet-control-layers-toggle {
-  background-color: var(--ctrl-bg) !important;
-  border-color: var(--ctrl-border) !important;
+  display: none !important;
+}
+
+.leaflet-control-layers-expanded {
+  padding: 10px 12px !important;
+  min-width: 180px;
 }
 
 .leaflet-control-layers label {
