@@ -1,6 +1,6 @@
 /* ============================================================================
   map.js - Geospatial Manifold (Leaflet + Esri Leaflet)
-  VERSION: 2026-04-29.a
+  VERSION: 2026-05-01.a
 
   WHAT THIS FILE DOES:
   - Initializes the map + basemap options (full viewport, no top banner)
@@ -780,26 +780,65 @@ function addZoomControl(map) {
 function addHomeButton(map) {
   const homeButton = L.control({ position: "topleft" });
   homeButton.onAdd = function () {
-    const btn = L.DomUtil.create("div", "home-button leaflet-control leaflet-bar");
-    btn.innerHTML = `<a href="#" id="home-button" title="Reset View"><span class="legend-icon">&#x2302;</span></a>`;
-    btn.onclick = function () { map.setView([DEFAULT_VIEW.lat, DEFAULT_VIEW.lng], DEFAULT_VIEW.zoom); };
-    L.DomEvent.disableScrollPropagation(btn);
-    L.DomEvent.disableClickPropagation(btn);
-    return btn;
+    const container = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+    // Build the anchor exactly like Leaflet zoom buttons so styling matches perfectly
+    const a = L.DomUtil.create("a", "", container);
+    a.href = "#";
+    a.title = "Reset View";
+    // Inline styles guarantee color match regardless of CSS specificity wars
+    a.style.cssText = [
+      "display:flex",
+      "align-items:center",
+      "justify-content:center",
+      "width:26px",
+      "height:26px",
+      "font-size:18px",
+      "line-height:1",
+      "color:#94b4c8",
+      "background:rgba(13,25,38,0.92)",
+      "text-decoration:none",
+      "border:none",
+    ].join(";");
+    a.innerHTML = "&#x2302;";
+
+    a.addEventListener("mouseover", () => {
+      a.style.background = "rgba(62,207,207,0.15)";
+      a.style.color = "#3ecfcf";
+    });
+    a.addEventListener("mouseout", () => {
+      a.style.background = "rgba(13,25,38,0.92)";
+      a.style.color = "#94b4c8";
+    });
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      map.setView([DEFAULT_VIEW.lat, DEFAULT_VIEW.lng], DEFAULT_VIEW.zoom);
+    });
+
+    L.DomEvent.disableScrollPropagation(container);
+    L.DomEvent.disableClickPropagation(container);
+    return container;
   };
   homeButton.addTo(map);
 }
 
 function addLegendControls(map) {
+  // ---- Legend toggle button (topright Leaflet control) ----
   const LegendToggleControl = L.Control.extend({
     options: { position: "topright" },
     onAdd: function () {
       const c = L.DomUtil.create("div", "leaflet-bar custom-legend-button");
-      c.innerHTML = '<span class="legend-icon">&#x2630;</span>';
+      // Use the same stacked-layers SVG icon as SG's native layer control
+      c.innerHTML = `<span class="legend-icon" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+          <polyline points="2 17 12 22 22 17"></polyline>
+          <polyline points="2 12 12 17 22 12"></polyline>
+        </svg>
+      </span>`;
       c.title = "Toggle Legend";
       c.onclick = function () {
-        const panels = document.getElementsByClassName("legend-panel");
-        for (const p of panels) p.classList.toggle("hidden");
+        const panel = document.getElementById("gm-legend-panel");
+        if (panel) panel.style.display = panel.style.display === "none" ? "block" : "none";
       };
       L.DomEvent.disableClickPropagation(c);
       return c;
@@ -807,95 +846,110 @@ function addLegendControls(map) {
   });
   map.addControl(new LegendToggleControl());
 
-  const legendPanel = L.control({ position: "topright" });
-  legendPanel.onAdd = () => {
-    const div = L.DomUtil.create("div", "legend-panel hidden");
-    div.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: false });
-    div.addEventListener("touchmove",  (e) => e.stopPropagation(), { passive: false });
-    div.addEventListener("wheel",      (e) => e.stopPropagation(), { passive: false });
-    div.innerHTML = `
-      <h2>Legends</h2>
+  // ---- Legend panel as plain DOM div (NOT a Leaflet control) ----
+  // This eliminates the double-box — only the toggle button is a Leaflet control.
+  const legendDiv = document.createElement("div");
+  legendDiv.id = "gm-legend-panel";
+  legendDiv.style.cssText = [
+    "display:none",
+    "position:absolute",
+    "top:10px",
+    "right:56px",        // sits left of the toggle button
+    "z-index:800",
+    "max-height:70vh",
+    "width:250px",
+    "overflow-y:auto",
+    "background:rgba(13,25,38,0.95)",
+    "border:1px solid rgba(255,255,255,0.1)",
+    "border-radius:8px",
+    "padding:10px",
+    "font-size:0.82rem",
+    "color:#7a9ab0",
+    "box-shadow:0 2px 12px rgba(0,0,0,0.5)",
+    "backdrop-filter:blur(8px)",
+  ].join(";");
 
-      <div class="legend-section">
-        <strong>Flood Hazard Zones (FEMA)</strong>
-        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#feb24c;"></span><em> 0.2% Annual Chance Flood Hazard</em></div>
-        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#f03b20;"></span><em> 1% Annual Chance Flood Hazard</em></div>
-        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#769ccd;"></span><em> Regulatory Floodway</em></div>
-        <div style="display:block;margin-top:6px;"><span class="legend-swatch" style="background:#e5d099;"></span><em> Reduced Risk Due to Levee</em></div>
+  legendDiv.innerHTML = `
+    <h2 style="color:#e8eef2;font-size:0.85rem;margin:0 0 8px;">Legends</h2>
+
+    <div style="margin-bottom:10px;">
+      <strong style="color:#e8eef2;font-size:0.78rem;">Flood Hazard Zones (FEMA)</strong>
+      <div style="display:block;margin-top:6px;"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;border:1px solid rgba(255,255,255,0.15);background:#feb24c;margin-right:6px;vertical-align:middle;"></span><em> 0.2% Annual Chance Flood Hazard</em></div>
+      <div style="display:block;margin-top:4px;"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;border:1px solid rgba(255,255,255,0.15);background:#f03b20;margin-right:6px;vertical-align:middle;"></span><em> 1% Annual Chance Flood Hazard</em></div>
+      <div style="display:block;margin-top:4px;"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;border:1px solid rgba(255,255,255,0.15);background:#769ccd;margin-right:6px;vertical-align:middle;"></span><em> Regulatory Floodway</em></div>
+      <div style="display:block;margin-top:4px;"><span style="display:inline-block;width:12px;height:12px;border-radius:2px;border:1px solid rgba(255,255,255,0.15);background:#e5d099;margin-right:6px;vertical-align:middle;"></span><em> Reduced Risk Due to Levee</em></div>
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <strong style="color:#e8eef2;font-size:0.78rem;">Fire Hazard Severity Zones</strong>
+      <div style="display:flex;gap:2px;margin-top:6px;">
+        <span style="flex:1;height:10px;background:#ffffbf;border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
+        <span style="flex:1;height:10px;background:#fdae61;border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
+        <span style="flex:1;height:10px;background:#d7191c;border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
       </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.7rem;margin-top:3px;"><span>Moderate</span><span>Very High</span></div>
+    </div>
 
-      <div class="legend-section">
-        <strong>Fire Hazard Severity Zones</strong>
-        <div class="legend-ramp">
-          <span class="ramp-swatch" style="background:#ffffbf;"></span>
-          <span class="ramp-swatch" style="background:#fdae61;"></span>
-          <span class="ramp-swatch" style="background:#d7191c;"></span>
-        </div>
-        <div class="legend-ramp-labels"><span>Moderate</span><span>Very High</span></div>
+    <div style="margin-bottom:10px;">
+      <strong style="color:#e8eef2;font-size:0.78rem;">Landslide Susceptibility (CGS)</strong>
+      <div style="display:flex;gap:2px;margin-top:6px;">
+        <span style="flex:1;height:10px;background:#ffffc5;border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
+        <span style="flex:1;height:10px;background:#f8d58b;border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
+        <span style="flex:1;height:10px;background:#f3ae3d;border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
+        <span style="flex:1;height:10px;background:#ec622b;border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
+        <span style="flex:1;height:10px;background:#d32d1f;border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
+        <span style="flex:1;height:10px;background:#9a1e13;border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
       </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.7rem;margin-top:3px;"><span>Lower</span><span>Higher</span></div>
+    </div>
 
-      <div class="legend-section">
-        <strong>Landslide Susceptibility (CGS)</strong>
-        <div class="legend-ramp">
-          <span class="ramp-swatch" style="background:#ffffc5;"></span>
-          <span class="ramp-swatch" style="background:#f8d58b;"></span>
-          <span class="ramp-swatch" style="background:#f3ae3d;"></span>
-          <span class="ramp-swatch" style="background:#db9b36;"></span>
-          <span class="ramp-swatch" style="background:#ec622b;"></span>
-          <span class="ramp-swatch" style="background:#d32d1f;"></span>
-          <span class="ramp-swatch" style="background:#9a1e13;"></span>
-        </div>
-        <div class="legend-ramp-labels"><span>Lower</span><span>Higher</span></div>
+    <div style="margin-bottom:10px;">
+      <strong style="color:#e8eef2;font-size:0.78rem;">Shaking Potential (MMI, 10% in 50 years)</strong>
+      <div style="display:flex;gap:2px;margin-top:6px;">
+        <span style="flex:1;height:10px;background:rgb(255,255,191);border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
+        <span style="flex:1;height:10px;background:rgb(245,245,0);border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
+        <span style="flex:1;height:10px;background:rgb(247,206,0);border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
+        <span style="flex:1;height:10px;background:rgb(250,125,0);border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
+        <span style="flex:1;height:10px;background:rgb(253,42,0);border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
+        <span style="flex:1;height:10px;background:rgb(199,8,8);border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
+        <span style="flex:1;height:10px;background:rgb(140,8,8);border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
       </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.7rem;margin-top:3px;"><span>MMI 4</span><span>MMI 10+</span></div>
+    </div>
 
-      <div class="legend-section">
-        <strong>Shaking Potential (MMI, 10% in 50 years)</strong>
-        <div class="legend-ramp">
-          <span class="ramp-swatch" style="background:rgb(255,255,191);"></span>
-          <span class="ramp-swatch" style="background:rgb(245,245,0);"></span>
-          <span class="ramp-swatch" style="background:rgb(247,206,0);"></span>
-          <span class="ramp-swatch" style="background:rgb(250,125,0);"></span>
-          <span class="ramp-swatch" style="background:rgb(253,42,0);"></span>
-          <span class="ramp-swatch" style="background:rgb(199,8,8);"></span>
-          <span class="ramp-swatch" style="background:rgb(140,8,8);"></span>
-        </div>
-        <div class="legend-ramp-labels"><span>MMI 4</span><span>MMI 10+</span></div>
+    <div style="margin-bottom:10px;">
+      <strong style="color:#e8eef2;font-size:0.78rem;">CalEnviroScreen Indicators (Percentile)</strong>
+      <div style="display:flex;gap:2px;margin-top:6px;">
+        <span style="flex:1;height:10px;background:#ffffcc;border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
+        <span style="flex:1;height:10px;background:#deebf7;border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
+        <span style="flex:1;height:10px;background:#9ecae1;border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
+        <span style="flex:1;height:10px;background:#4292c6;border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
+        <span style="flex:1;height:10px;background:#08306b;border:1px solid rgba(255,255,255,0.12);border-radius:2px;"></span>
       </div>
+      <div style="display:flex;justify-content:space-between;font-size:0.7rem;margin-top:3px;"><span>0-10</span><span>90-100</span></div>
+    </div>
 
-      <div class="legend-section">
-        <strong>CalEnviroScreen Indicators (Percentile)</strong>
-        <div class="legend-ramp">
-          <span class="ramp-swatch" style="background:#ffffcc;"></span>
-          <span class="ramp-swatch" style="background:#deebf7;"></span>
-          <span class="ramp-swatch" style="background:#9ecae1;"></span>
-          <span class="ramp-swatch" style="background:#4292c6;"></span>
-          <span class="ramp-swatch" style="background:#08306b;"></span>
-        </div>
-        <div class="legend-ramp-labels"><span>0-10</span><span>90-100</span></div>
-      </div>
+    <div style="margin-bottom:10px;">
+      <strong style="color:#e8eef2;font-size:0.78rem;">Active Fires (WFIGS / NIFC)</strong>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px;"><span style="font-size:15px;">🔥</span><span>Small incident</span></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:4px;"><span style="font-size:24px;">🔥</span><span>Large incident</span></div>
+    </div>
 
-      <div class="legend-section">
-        <strong>Active Fires (WFIGS / NIFC)</strong>
-        <div style="display:flex;align-items:center;gap:10px;margin-top:6px;"><span style="font-size:16px;">🔥</span><span>Small incident</span></div>
-        <div style="display:flex;align-items:center;gap:10px;margin-top:6px;"><span style="font-size:26px;">🔥</span><span>Large incident</span></div>
-      </div>
+    <div>
+      <strong style="color:#e8eef2;font-size:0.78rem;">Faults</strong>
+      <div style="margin-top:4px;">Click fault lines to see fault name and age/activity.</div>
+    </div>
+  `;
 
-      <div class="legend-section">
-        <strong>Faults</strong>
-        <div style="display:block;margin-top:6px;">Click fault lines to see fault name and age/activity.</div>
-      </div>
-    `;
-    return div;
-  };
-  legendPanel.addTo(map);
+  // Inject into the map container so it overlays the map naturally
+  map.getContainer().appendChild(legendDiv);
 
-  document.addEventListener("DOMContentLoaded", function () {
-    const lp = document.querySelector(".legend-panel");
-    if (lp) {
-      lp.addEventListener("mouseenter", () => map.scrollWheelZoom.disable());
-      lp.addEventListener("mouseleave", () => map.scrollWheelZoom.enable());
-    }
-  });
+  // Prevent map interactions when hovering legend
+  legendDiv.addEventListener("mouseenter", () => map.scrollWheelZoom.disable());
+  legendDiv.addEventListener("mouseleave", () => map.scrollWheelZoom.enable());
+  legendDiv.addEventListener("wheel",      (e) => e.stopPropagation(), { passive: false });
+  legendDiv.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: false });
+  legendDiv.addEventListener("touchmove",  (e) => e.stopPropagation(), { passive: false });
 }
 
 /* ============================================================================
@@ -1395,12 +1449,25 @@ const PanelController = (function () {
       _renderTab(tab, _lastResults);
       const bodyEl = $("panel-body");
       const sectionEl = document.createElement("div");
-      sectionEl.innerHTML = `<h2 style="font-size:14px;color:#0c1f2c;margin:16px 0 8px;border-bottom:1px solid #eee;padding-bottom:4px;">${title}</h2>`;
+      sectionEl.innerHTML = `<h2 style="font-size:14px;color:#0c1f2c;margin:16px 0 8px;border-bottom:1px solid #ccc;padding-bottom:4px;">${title}</h2>`;
       const cards = bodyEl?.querySelectorAll(".dash-card, .no-data-card") || [];
       cards.forEach((card) => {
         const clone = card.cloneNode(true);
-        clone.querySelectorAll(".severity-track,.mmi-scale,.pct-track,.stat-row").forEach(el => el.remove());
-        clone.style.cssText = "margin-bottom:12px;padding:10px;border:1px solid #ddd;border-radius:6px;background:#f9f9f9;";
+        // Remove visual-only elements that don't print well
+        clone.querySelectorAll(".severity-track,.mmi-scale,.pct-track,.stat-row,.haz-badge").forEach(el => el.remove());
+        // Force all text dark for white PDF background
+        clone.style.cssText = "margin-bottom:12px;padding:10px;border:1px solid #ccc;border-radius:6px;background:#f9f9f9;color:#111;";
+        // Walk all child elements and force readable colors
+        clone.querySelectorAll("*").forEach(el => {
+          el.style.color = "#222";
+          el.style.background = "transparent";
+          el.style.borderColor = "#ccc";
+        });
+        // Re-darken label text specifically
+        clone.querySelectorAll(".dash-card-label").forEach(el => { el.style.color = "#555"; el.style.fontSize = "10px"; });
+        clone.querySelectorAll(".dash-card-explain,.dash-card-sub,.fault-dist-text,.pct-val,.pct-name").forEach(el => { el.style.color = "#333"; });
+        clone.querySelectorAll(".dash-card-value,.fault-name-text").forEach(el => { el.style.color = "#0c1f2c"; el.style.fontWeight = "600"; });
+        clone.querySelectorAll("strong").forEach(el => { el.style.color = "#0c1f2c"; });
         sectionEl.appendChild(clone);
       });
       printEl.appendChild(sectionEl);
@@ -1514,14 +1581,16 @@ function installClickReport(map, layers) {
     async function nearestZoneAcross(layersArr, fieldName) {
       let best = null;
       for (const lyr of layersArr) {
-        // Use bounds query instead of .nearby() — .nearby() is unreliable on polygon layers
+        // Use intersects() not within() — within() only returns features ENTIRELY
+        // inside the box, which misses large flood/fire polygons that span the area.
+        // intersects() returns anything that touches the bounding box.
         const degOffset = UI.NEARBY_METERS / 111320;
         const sw = L.latLng(latlng.lat - degOffset, latlng.lng - degOffset);
         const ne = L.latLng(latlng.lat + degOffset, latlng.lng + degOffset);
         const bounds = L.latLngBounds(sw, ne);
 
         const { err, fc } = await new Promise((resolve) => {
-          lyr.query().within(bounds).run((err, fc) => resolve({ err, fc }));
+          lyr.query().intersects(bounds).run((err, fc) => resolve({ err, fc }));
         });
 
         if (err || !fc?.features?.length) continue;
