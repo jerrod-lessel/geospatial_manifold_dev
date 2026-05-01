@@ -1,6 +1,6 @@
 /* ============================================================================
   map.js - Geospatial Manifold (Leaflet + Esri Leaflet)
-  VERSION: 2026-05-01.a
+  VERSION: 2026-05-01.b
 
   WHAT THIS FILE DOES:
   - Initializes the map + basemap options (full viewport, no top banner)
@@ -827,12 +827,12 @@ function addLegendControls(map) {
     options: { position: "topright" },
     onAdd: function () {
       const c = L.DomUtil.create("div", "leaflet-bar custom-legend-button");
-      // Use the same stacked-layers SVG icon as SG's native layer control
+      // Hamburger icon (three horizontal lines) — distinct from the stacked-layers icon on the layers button
       c.innerHTML = `<span class="legend-icon" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-          <polyline points="2 17 12 22 22 17"></polyline>
-          <polyline points="2 12 12 17 22 12"></polyline>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6"  x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
         </svg>
       </span>`;
       c.title = "Toggle Legend";
@@ -1581,16 +1581,19 @@ function installClickReport(map, layers) {
     async function nearestZoneAcross(layersArr, fieldName) {
       let best = null;
       for (const lyr of layersArr) {
-        // Use intersects() not within() — within() only returns features ENTIRELY
-        // inside the box, which misses large flood/fire polygons that span the area.
-        // intersects() returns anything that touches the bounding box.
+        // Use intersects() to catch large polygons that span the area.
+        // returnGeometry(true) is required so Turf can calculate the exact
+        // distance to the polygon edge — same pattern as fault distance queries.
         const degOffset = UI.NEARBY_METERS / 111320;
         const sw = L.latLng(latlng.lat - degOffset, latlng.lng - degOffset);
         const ne = L.latLng(latlng.lat + degOffset, latlng.lng + degOffset);
         const bounds = L.latLngBounds(sw, ne);
 
         const { err, fc } = await new Promise((resolve) => {
-          lyr.query().intersects(bounds).run((err, fc) => resolve({ err, fc }));
+          lyr.query()
+            .intersects(bounds)
+            .returnGeometry(true)
+            .run((err, fc) => resolve({ err, fc }));
         });
 
         if (err || !fc?.features?.length) continue;
