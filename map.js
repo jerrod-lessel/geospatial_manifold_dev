@@ -1625,7 +1625,7 @@ function installClickReport(map, layers) {
   const map = createMap();
   const basemaps = createBasemaps();
 
-  basemaps.cartoDark.addTo(map);
+  basemaps.cartoLight.addTo(map);
   addCaliforniaFocusMask(map);
 
   const fire        = createFireLayers();
@@ -1710,12 +1710,16 @@ function installClickReport(map, layers) {
     "CES Overall Score":          LAYERS.cesScoreLayer,
   };
 
+  // Layer control at topleft — keeps topright clear for the legend toggle + panel only.
+  // collapsed:true hides the toggle button since we use our own custom legend button.
   L.control.layers(
     { "OpenStreetMap": basemaps.baseOSM, "Esri Satellite": basemaps.esriSat, "Carto Light": basemaps.cartoLight, "Carto Dark": basemaps.cartoDark },
-    LAYER_TOGGLES
+    LAYER_TOGGLES,
+    { position: "topleft", collapsed: true }
   ).addTo(map);
 
-  L.control.scale({ imperial: true }).addTo(map);
+  // Scale bar at bottomright above attribution
+  L.control.scale({ imperial: true, position: "bottomright" }).addTo(map);
   addZoomControl(map);
   addHomeButton(map);
   addLegendControls(map);
