@@ -199,16 +199,16 @@ html, body {
   color: var(--panel-accent) !important;
 }
 
-/* Attribution */
+/* Attribution — matches SG lightened colors */
 .leaflet-control-attribution {
-  background: rgba(13,25,38,0.75) !important;
-  color: #4a6a80 !important;
+  background: rgba(13,25,38,0.80) !important;
+  color: #7a9ab0 !important;
   font-size: 10px !important;
   backdrop-filter: blur(6px);
 }
 
 .leaflet-control-attribution a {
-  color: #5a85a0 !important;
+  color: #5a9ab8 !important;
 }
 
 /* Layer control */
@@ -221,10 +221,28 @@ html, body {
   color: var(--ctrl-text) !important;
 }
 
-/* Layer control — toggle button hidden, we use our own legend button.
-   Panel expands when toggled via JS in addLegendControls. */
+/* Layer control toggle button — styled dark like other controls */
 .leaflet-control-layers-toggle {
-  display: none !important;
+  background: var(--ctrl-bg) !important;
+  border-color: var(--ctrl-border) !important;
+  width: 36px !important;
+  height: 36px !important;
+  background-image: none !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Replace the default Leaflet layers icon with our hamburger */
+.leaflet-control-layers-toggle::after {
+  content: "☰";
+  font-size: 18px;
+  color: var(--ctrl-text);
+  line-height: 1;
+}
+
+.leaflet-control-layers-toggle:hover {
+  background: var(--ctrl-hover) !important;
 }
 
 .leaflet-control-layers-expanded {
@@ -259,6 +277,21 @@ html, body {
 
 .home-button:hover {
   background: var(--ctrl-hover) !important;
+}
+
+/* Target the anchor inside home-button so the house symbol
+   gets the dark-theme text color, not the browser default grey */
+.home-button a,
+.home-button a:visited,
+#home-button,
+#home-button:visited {
+  color: var(--ctrl-text) !important;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
 }
 
 #home-button .legend-icon {
@@ -833,6 +866,52 @@ html, body {
 }
 
 .donation-text a:hover { text-decoration: underline; }
+
+#panel-site-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+  color: var(--panel-text-label);
+  border-top: 1px solid var(--panel-border);
+  padding-top: 8px;
+  margin-top: 2px;
+}
+
+#panel-site-footer a {
+  color: var(--panel-text-label);
+  text-decoration: none;
+}
+
+#panel-site-footer a:hover {
+  color: var(--panel-accent);
+}
+
+/* Pulsing click marker (matches Spectral Glimpse) */
+.click-marker-dot {
+  width: 12px;
+  height: 12px;
+  background: var(--panel-accent);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  position: relative;
+}
+
+.click-marker-dot::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px; height: 24px;
+  border: 1.5px solid rgba(62,207,207,0.45);
+  border-radius: 50%;
+  animation: gmClickRing 2s infinite;
+}
+
+@keyframes gmClickRing {
+  0%,100% { opacity: 0.6; transform: translate(-50%,-50%) scale(1); }
+  50%      { opacity: 0.1; transform: translate(-50%,-50%) scale(1.5); }
+}
 
 /* ============================================================================
    9) EMOJI MARKER ICONS
