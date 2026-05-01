@@ -904,6 +904,26 @@ html, body {
   color: var(--panel-accent);
 }
 
+#click-hint {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: rgba(13,25,38,0.88);
+  border: 0.5px solid rgba(255,255,255,0.12);
+  border-radius: 20px;
+  padding: 7px 16px;
+  font-size: 12px;
+  /* Lightened from original #475569 */
+  color: #7a9ab0;
+  white-space: nowrap;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+#click-hint.hidden { opacity: 0; pointer-events: none; }
+
 /* Pulsing click marker (matches Spectral Glimpse) */
 .click-marker-dot {
   width: 12px;
