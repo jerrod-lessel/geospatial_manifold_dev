@@ -1,6 +1,6 @@
 /* ============================================================================
    style.css - Geospatial Manifold
-   VERSION: 2026-04-29.a
+   VERSION: 2026-05-01.a
 
    LAYOUT:
    - Full viewport map (no top banner)
@@ -211,17 +211,24 @@ html, body {
   color: #5a9ab8 !important;
 }
 
-/* Layer control */
+/* Layer control — outer container borderless to prevent double-box */
 .leaflet-control-layers {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: var(--ctrl-text) !important;
+}
+
+/* Expanded panel gets dark box */
+.leaflet-control-layers-expanded {
   background: var(--ctrl-bg) !important;
   border: 1px solid var(--ctrl-border) !important;
   border-radius: 8px !important;
   box-shadow: 0 2px 12px rgba(0,0,0,0.5) !important;
   backdrop-filter: blur(8px);
-  color: var(--ctrl-text) !important;
 }
 
-/* Layer control toggle button — styled dark like other controls */
+/* Layer control toggle button — styled dark, stacked-layers SVG icon */
 .leaflet-control-layers-toggle {
   background: var(--ctrl-bg) !important;
   border-color: var(--ctrl-border) !important;
@@ -229,20 +236,30 @@ html, body {
   height: 36px !important;
   background-image: none !important;
   display: flex !important;
-  align-items: center;
-  justify-content: center;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
-/* Replace the default Leaflet layers icon with our hamburger */
+/* Stacked-layers SVG icon replacing default Leaflet icon */
 .leaflet-control-layers-toggle::after {
-  content: "☰";
-  font-size: 18px;
-  color: var(--ctrl-text);
-  line-height: 1;
+  content: "";
+  display: block;
+  width: 18px;
+  height: 18px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2394b4c8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolygon points='12 2 2 7 12 12 22 7 12 2'%3E%3C/polygon%3E%3Cpolyline points='2 17 12 22 22 17'%3E%3C/polyline%3E%3Cpolyline points='2 12 12 17 22 12'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 18px 18px;
 }
 
 .leaflet-control-layers-toggle:hover {
   background: var(--ctrl-hover) !important;
+}
+
+/* Match legend button size to layers toggle */
+.custom-legend-button {
+  width: 36px !important;
+  height: 36px !important;
 }
 
 .leaflet-control-layers-expanded {
@@ -306,14 +323,14 @@ html, body {
   transform: translateY(-1px);
 }
 
-/* Legend toggle button */
+/* Legend toggle button — matches layers button size and style */
 .custom-legend-button {
   background: var(--ctrl-bg) !important;
   border: 1px solid var(--ctrl-border) !important;
   border-radius: 4px;
   box-shadow: 0 1px 5px rgba(0,0,0,0.5);
-  width: 43px;
-  height: 43px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -327,10 +344,10 @@ html, body {
 }
 
 .custom-legend-button .legend-icon {
-  font-size: 22px;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--ctrl-text);
-  transform: translateY(-1px);
 }
 
 /* Scale bar */
