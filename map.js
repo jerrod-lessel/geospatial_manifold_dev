@@ -80,7 +80,7 @@ const UI = {
 const NREL = {
   // API key stored in Cloudflare Worker, never put it here
   WORKER_URL: "https://round-dust-6f7a.jerrod-lessel.workers.dev",
-  ATTRIBUTION: '<a href="https://afdc.energy.gov/stations/">NREL/AFDC</a>',
+  ATTRIBUTION: '<a href="https://afdc.energy.gov/stations/">NLR/AFDC</a>',
 };
 
 /* ============================================================================
